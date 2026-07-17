@@ -1,0 +1,42 @@
+:root {
+  /* Color Palette - Premium AI Space Dark Theme */
+  --bg-primary: #050508;
+  --bg-secondary: #0c0d14;
+  --bg-tertiary: #141622;
+  
+  --text-primary: #ffffff;
+  --text-secondary: #8e92a4;
+  --text-muted: #52566b;
+  
+  --color-primary: #3b82f6;       /* Electric Blue */
+  --color-primary-glow: rgba(59, 130, 246, 0.15);
+  --color-accent: #8b5cf6;        /* Premium Violet */
+  --color-accent-glow: rgba(139, 92, 246, 0.15);
+  --color-success: #10b981;       /* Smart Green (e.g. available slot) */
+  --color-success-glow: rgba(16, 185, 129, 0.15);
+  --color-error: #ef4444;         /* Occupied/Alert Red */
+  --color-error-glow: rgba(239, 68, 68, 0.15);
+  
+  --border-color: rgba(255, 255, 255, 0.06);
+  --border-color-hover: rgba(255, 255, 255, 0.12);
+  
+  /* Typography */
+  --font-sans: 'Cabinet Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Shadows & Glows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.8);
+  --glow-primary: 0 0 20px rgba(59, 130, 246, 0.3);
+  --glow-accent: 0 0 20px rgba(139, 92, 246, 0.3);
+
+  /* Layout and Spacing */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  
+  --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}

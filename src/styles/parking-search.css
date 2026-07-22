@@ -6,7 +6,7 @@
   width: 100%;
   padding: 8rem 6%;
   background-color: var(--bg-primary);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-top: 1px solid var(--border-color);
   box-sizing: border-box;
   z-index: 2;
 }
@@ -18,22 +18,20 @@
 }
 
 .search-section-title {
-  font-size: 2.85rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 1rem;
-  background: linear-gradient(180deg, #ffffff 40%, rgba(255, 255, 255, 0.6) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
 }
 
 .search-section-subtitle {
   color: var(--text-secondary);
-  font-size: 1.125rem;
-  font-weight: 300;
+  font-size: 1.05rem;
+  font-weight: 400;
   max-width: 600px;
   margin: 0 auto;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 /* Layout Grid */
@@ -49,12 +47,10 @@
 /* Left Column: Search Form Card */
 .search-form-card {
   background-color: var(--bg-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-md); /* 14px rounded */
   padding: 2.25rem;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
@@ -63,37 +59,33 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .form-label {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
 }
 
 /* Form inputs & Selects styling */
 .form-input {
-  background-color: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  padding: 0.85rem 1rem;
-  font-size: 0.95rem;
-  font-family: var(--font-sans);
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
   outline: none;
-  transition: 
-    border-color var(--transition-fast), 
-    box-shadow var(--transition-fast),
-    background-color var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .form-input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
-  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  background-color: var(--bg-secondary);
 }
 
 .form-input::placeholder {
@@ -114,36 +106,35 @@
 }
 
 .vehicle-btn {
-  background-color: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
-  padding: 0.75rem;
-  font-size: 0.875rem;
+  padding: 0.65rem;
+  font-size: 0.825rem;
   font-weight: 600;
   text-align: center;
   transition: all var(--transition-fast);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .vehicle-btn svg {
-  opacity: 0.6;
-  transition: opacity var(--transition-fast);
+  opacity: 0.7;
 }
 
 .vehicle-btn:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color-hover);
   color: var(--text-primary);
 }
 
 .vehicle-btn.active {
-  background-color: var(--color-primary-glow);
+  background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .vehicle-btn.active svg {
@@ -153,12 +144,12 @@
 /* Search CTA Submit Button */
 .btn-submit {
   width: 100%;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--color-primary);
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  padding: 1rem;
-  border-radius: var(--radius-sm);
+  padding: 0.95rem;
+  border-radius: var(--radius-md); /* 14px rounded */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,9 +159,9 @@
 }
 
 .btn-submit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.25);
-  filter: brightness(1.05);
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
 }
 
 .btn-submit:active {
@@ -192,56 +183,51 @@
   align-items: center;
   justify-content: center;
   flex-grow: 1;
-  border: 1px dashed rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
   padding: 3rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-align: center;
 }
 
 .empty-state-icon {
   margin-bottom: 1.25rem;
-  opacity: 0.4;
   color: var(--color-primary);
 }
 
 .empty-state-text {
   font-size: 1.05rem;
-  font-weight: 400;
+  font-weight: 600;
   margin-bottom: 0.5rem;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .empty-state-desc {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   max-width: 320px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-/* Result Cards styling */
+/* Result Cards styling - Sleek Dark Cards */
 .parking-card {
   background-color: var(--bg-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); /* 14px */
   padding: 1.5rem;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 1.5rem;
   align-items: center;
-  transition: 
-    border-color var(--transition-fast),
-    background-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    transform var(--transition-fast);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 
 .parking-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+  border-color: var(--border-color-hover);
+  box-shadow: var(--shadow-md);
   background-color: var(--bg-tertiary);
-  box-shadow: var(--shadow-md), 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* Card Details - Left section */
@@ -249,7 +235,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .card-title-row {
@@ -261,32 +247,32 @@
 
 .card-title {
   font-size: 1.15rem;
-  font-weight: 700;
+  font-weight: 650;
   color: var(--text-primary);
-  letter-spacing: -0.01em;
 }
 
 .card-rating-container {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  background-color: rgba(255, 255, 255, 0.03);
-  padding: 0.2rem 0.5rem;
+  background-color: var(--bg-tertiary);
+  padding: 0.15rem 0.45rem;
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
+  font-size: 0.725rem;
   font-weight: 700;
   color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .rating-star {
-  color: #ffb800; /* Warm premium gold */
+  color: #ffb800;
 }
 
 .card-meta-row {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  font-size: 0.85rem;
+  font-size: 0.825rem;
   color: var(--text-secondary);
 }
 
@@ -300,15 +286,15 @@
 }
 
 .badge {
-  font-size: 0.7rem;
+  font-size: 0.675rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.25rem 0.65rem;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.5rem;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .badge-ev {
@@ -334,7 +320,7 @@
 
 .card-price {
   font-size: 1.35rem;
-  font-weight: 800;
+  font-weight: 750;
   color: var(--text-primary);
 }
 
@@ -345,11 +331,11 @@
 }
 
 .card-slots-count {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--color-success);
   background-color: var(--color-success-glow);
-  padding: 0.2rem 0.5rem;
+  padding: 0.15rem 0.45rem;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -377,7 +363,7 @@
   }
 
   .search-section-title {
-    font-size: 2.25rem;
+    font-size: 2rem;
   }
 
   .search-form-card {
@@ -395,7 +381,7 @@
     flex-direction: row;
     justify-content: space-between;
     width: 100%;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--border-color);
     padding-top: 0.85rem;
   }
 }

@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/auth/AuthLayout';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { authService } from '../services/authService';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const { login } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const validateForm = () => {
     const newErrors = {};
@@ -32,32 +39,26 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
-    // Simulate login interaction
-    console.log('Logging in user:', { email, password, rememberMe });
-    alert(`Login request submitted successfully for: ${email}`);
-
-    /*
-     * TODO: Integrate Supabase Authentication
-     *
-     * Example:
-     * const { data, error } = await supabase.auth.signInWithPassword({
-     *   email: email,
-     *   password: password,
-     * });
-     *
-     * if (error) {
-     *   setErrors({ form: error.message });
-     *   return;
-     * }
-     *
-     * // Redirect user to dashboard
-     * navigate('/dashboard');
-     */
+    try {
+      const data = await login(email, password);
+      showToast('Signed in successfully!', 'success');
+      
+      // Fetch user profile role to route appropriately
+      const profile = await authService.getUserProfile(data.user.id);
+      if (profile.role === 'operator' || profile.role === 'admin') {
+        navigate('/operator');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Authentication failed. Please verify credentials.', 'error');
+    }
   };
 
   return (

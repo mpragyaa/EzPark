@@ -1,54 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { parkingService } from '../../services/parkingService';
 import '../../styles/parking-search.css';
-
-// Sample parking data
-const SAMPLE_PARKING_SPOTS = [
-  {
-    id: 'spot-1',
-    name: 'Aether Premium Plaza',
-    distance: '0.2 miles away',
-    price: 4.50,
-    availableSlots: 14,
-    hasEVCharging: true,
-    securityStatus: '24/7 Patrol & CCTV',
-    rating: 4.9,
-    vehicleTypes: ['car', 'ev']
-  },
-  {
-    id: 'spot-2',
-    name: 'Vortex Cyberport Garage',
-    distance: '0.5 miles away',
-    price: 6.00,
-    availableSlots: 3,
-    hasEVCharging: true,
-    securityStatus: 'Biometric Entrance',
-    rating: 4.8,
-    vehicleTypes: ['car', 'ev', 'bike']
-  },
-  {
-    id: 'spot-3',
-    name: 'Lumina Smart Hub',
-    distance: '0.8 miles away',
-    price: 3.50,
-    availableSlots: 22,
-    hasEVCharging: false,
-    securityStatus: 'CCTV Active',
-    rating: 4.6,
-    vehicleTypes: ['car', 'bike']
-  },
-  {
-    id: 'spot-4',
-    name: 'Nexus Underground Vault',
-    distance: '1.2 miles away',
-    price: 8.00,
-    availableSlots: 5,
-    hasEVCharging: true,
-    securityStatus: 'Armed Guards',
-    rating: 5.0,
-    vehicleTypes: ['car', 'ev']
-  }
-];
 
 export default function ParkingSearch() {
   const [destination, setDestination] = useState('');
@@ -58,26 +11,46 @@ export default function ParkingSearch() {
   
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  
+  const [rawParkingLots, setRawParkingLots] = useState([]);
   const [filteredResults, setFilteredResults] = useState([]);
+
+  // Fetch parking facilities from Supabase on mount
+  useEffect(() => {
+    const loadLots = async () => {
+      try {
+        const data = await parkingService.fetchLots();
+        // Add dynamic mock distance since it's computed relative to client search
+        const mappedData = data.map((lot, idx) => ({
+          ...lot,
+          distance: `${(0.2 + idx * 0.3).toFixed(1)} miles away`
+        }));
+        setRawParkingLots(mappedData);
+      } catch (err) {
+        console.error('Error fetching Supabase facilities:', err);
+      }
+    };
+    loadLots();
+  }, []);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setIsSearching(true);
     setHasSearched(false);
 
-    // Simulate luxury AI scanning delay
     setTimeout(() => {
-      // Filter by vehicle type
-      const results = SAMPLE_PARKING_SPOTS.filter(spot => 
-        spot.vehicleTypes.includes(vehicleType)
-      );
+      // Filter the live database records by vehicle type
+      const results = rawParkingLots.filter(spot => {
+        if (vehicleType === 'ev') return spot.has_ev_charging;
+        return true; // Match standard cars / bikes
+      });
+
       setFilteredResults(results);
       setIsSearching(false);
       setHasSearched(true);
     }, 1200);
   };
 
-  // Stagger container animation
   const listVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -88,7 +61,6 @@ export default function ParkingSearch() {
     }
   };
 
-  // Card slide-up animation
   const cardVariants = {
     hidden: { y: 25, opacity: 0 },
     show: { 
@@ -102,9 +74,9 @@ export default function ParkingSearch() {
     <section className="search-section-container">
       {/* Title Header */}
       <div className="search-section-header">
-        <h2 className="search-section-title">Find Parking in Seconds</h2>
+        <h2 className="search-section-title">Find Organized Parking Facilities</h2>
         <p className="search-section-subtitle">
-          Search nearby parking spaces with real-time availability and AI-powered recommendations.
+          Search nearby facilities with real-time floor availability and AI occupancy predictions.
         </p>
       </div>
 
@@ -113,14 +85,13 @@ export default function ParkingSearch() {
         
         {/* Left Column: Form Panel */}
         <form className="search-form-card" onSubmit={handleSearchSubmit}>
-          
           {/* Destination */}
           <div className="form-group">
             <label className="form-label">Destination</label>
             <input 
               type="text" 
               className="form-input" 
-              placeholder="Enter destination..."
+              placeholder="Mall, Airport, Hospital, Event..."
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               required
@@ -156,11 +127,12 @@ export default function ParkingSearch() {
             <label className="form-label">Vehicle Type</label>
             <div className="vehicle-selector-row">
               <button
+                key="car"
                 type="button"
                 className={`vehicle-btn ${vehicleType === 'car' ? 'active' : ''}`}
                 onClick={() => setVehicleType('car')}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
                   <circle cx="7" cy="17" r="2" />
                   <path d="M9 17h6" />
@@ -169,11 +141,12 @@ export default function ParkingSearch() {
                 <span>Car</span>
               </button>
               <button
+                key="bike"
                 type="button"
                 className={`vehicle-btn ${vehicleType === 'bike' ? 'active' : ''}`}
                 onClick={() => setVehicleType('bike')}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="5.5" cy="17.5" r="2.5" />
                   <circle cx="18.5" cy="17.5" r="2.5" />
                   <path d="M15 6h1a2 2 0 0 1 2 2v2" />
@@ -182,11 +155,12 @@ export default function ParkingSearch() {
                 <span>Bike</span>
               </button>
               <button
+                key="ev"
                 type="button"
                 className={`vehicle-btn ${vehicleType === 'ev' ? 'active' : ''}`}
                 onClick={() => setVehicleType('ev')}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19" />
                   <line x1="6" y1="12" x2="18" y2="12" />
                   <path d="M12 7l-3 5h6l-3 5" />
@@ -210,7 +184,7 @@ export default function ParkingSearch() {
                   <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" />
                   <path d="M12 2a10 10 0 0 1 10 10" />
                 </svg>
-                <span>Scanning Spaces...</span>
+                <span>Scanning Facilities...</span>
               </>
             ) : (
               <>
@@ -218,7 +192,7 @@ export default function ParkingSearch() {
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <span>Find Parking</span>
+                <span>Search Facilities</span>
               </>
             )}
           </motion.button>
@@ -228,7 +202,6 @@ export default function ParkingSearch() {
         <div className="results-container">
           <AnimatePresence mode="wait">
             
-            {/* 1. Loading/Scanning State */}
             {isSearching && (
               <motion.div 
                 key="scanning"
@@ -244,14 +217,13 @@ export default function ParkingSearch() {
                     <path d="M12 6v6l4 2" />
                   </svg>
                 </div>
-                <div className="empty-state-text">Querying Satellite Sensors</div>
+                <div className="empty-state-text">Querying Facility Occupancies</div>
                 <div className="empty-state-desc">
                   Analyzing current occupancy levels and fetching AI recommendations...
                 </div>
               </motion.div>
             )}
 
-            {/* 2. Initial Empty State (before search) */}
             {!hasSearched && !isSearching && (
               <motion.div 
                 key="empty"
@@ -268,12 +240,11 @@ export default function ParkingSearch() {
                 </div>
                 <div className="empty-state-text">Enter Destination details</div>
                 <div className="empty-state-desc">
-                  Your personalized parking spaces dashboard will compile recommendations here.
+                  Your personalized parking facilities dashboard will compile recommendations here.
                 </div>
               </motion.div>
             )}
 
-            {/* 3. Search Results State */}
             {hasSearched && !isSearching && (
               <motion.div
                 key="results"
@@ -291,13 +262,12 @@ export default function ParkingSearch() {
                       variants={cardVariants}
                       whileHover={{ scale: 1.015 }}
                     >
-                      {/* Card Details */}
                       <div className="card-info">
                         <div className="card-title-row">
                           <h3 className="card-title">{spot.name}</h3>
                           <div className="card-rating-container">
                             <span className="rating-star">★</span>
-                            <span>{spot.rating}</span>
+                            <span>4.8</span>
                           </div>
                         </div>
 
@@ -315,12 +285,12 @@ export default function ParkingSearch() {
                               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                               <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                             </svg>
-                            {spot.securityStatus}
+                            {spot.has_cctv ? 'CCTV Active' : 'Patrolled'}
                           </span>
                         </div>
 
                         <div className="card-badges">
-                          {spot.hasEVCharging && (
+                          {spot.has_ev_charging && (
                             <span className="badge badge-ev">
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -332,20 +302,19 @@ export default function ParkingSearch() {
                         </div>
                       </div>
 
-                      {/* Card Stats */}
                       <div className="card-stats">
                         <div className="card-price">
-                          ${spot.price.toFixed(2)}<span>/hr</span>
+                          ${parseFloat(spot.price_per_hour).toFixed(2)}<span>/hr</span>
                         </div>
-                        <div className={`card-slots-count ${spot.availableSlots <= 5 ? 'limited' : ''}`}>
-                          {spot.availableSlots} slots left
+                        <div className={`card-slots-count ${spot.available_slots <= 5 ? 'limited' : ''}`}>
+                          {spot.available_slots} spaces left
                         </div>
                       </div>
                     </motion.div>
                   ))
                 ) : (
                   <div className="results-empty-state">
-                    <div className="empty-state-text">No spaces found</div>
+                    <div className="empty-state-text">No facilities found</div>
                     <div className="empty-state-desc">
                       Try selecting a different vehicle type or search query to load alternative recommendations.
                     </div>
@@ -358,7 +327,6 @@ export default function ParkingSearch() {
 
       </div>
 
-      {/* Spin Keyframes Injection */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }

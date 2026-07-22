@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../contexts/AuthContext';
 import '../../styles/navbar.css';
 
 const MotionLink = motion(Link);
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,6 +39,10 @@ export default function Navbar() {
     }
   };
 
+  const ctaPath = isAuthenticated
+    ? (user?.role === 'operator' || user?.role === 'admin' ? '/operator' : '/dashboard')
+    : '/login';
+
   return (
     <div className={`navbar-wrapper ${scrolled ? 'scrolled' : ''}`}>
       <motion.nav
@@ -63,8 +69,8 @@ export default function Navbar() {
             </a>
           </li>
           <li>
-            <Link to="/dashboard" className="navbar-link">
-              Dashboard
+            <Link to={ctaPath} className="navbar-link">
+              Console
             </Link>
           </li>
           <li>
@@ -76,7 +82,7 @@ export default function Navbar() {
 
         {/* Right: Premium CTA Button */}
         <MotionLink
-          to="/dashboard"
+          to={ctaPath}
           className="navbar-cta"
           whileHover={{ 
             scale: 1.04,
@@ -85,7 +91,7 @@ export default function Navbar() {
           }}
           whileTap={{ scale: 0.98 }}
         >
-          Open Dashboard →
+          Open Console →
         </MotionLink>
       </motion.nav>
     </div>

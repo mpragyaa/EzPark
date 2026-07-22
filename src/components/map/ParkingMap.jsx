@@ -1,161 +1,141 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import ParkingList from './ParkingList';
-import { parkingLocations } from '../../data/parkingData';
-import { createCustomMarkerIcon } from './MapMarker';
+import { parkingService } from '../../services/parkingService';
+import { mockParkingFacilities } from '../../data/mockParkingFacilities';
+import LeafletMap from '../maps/LeafletMap';
 import '../../styles/map.css';
 
-// Dynamic Leaflet Loader Helper
-const loadLeafletAssets = () => {
-  return new Promise((resolve) => {
-    if (window.L) {
-      resolve(window.L);
-      return;
-    }
+// ─── Supabase availability check ──────────────────────────────────────────────
+// If env vars are missing we skip the network call entirely and go straight
+// to mock data — no error will be thrown in the browser console.
+const SUPABASE_CONFIGURED =
+  Boolean(import.meta.env.VITE_SUPABASE_URL) &&
+  Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY) &&
+  !import.meta.env.VITE_SUPABASE_URL.includes('placeholder');
 
-    // Append Leaflet Stylesheet
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-    link.crossOrigin = '';
-    document.head.appendChild(link);
+// ─── Data normaliser ─────────────────────────────────────────────────────────
+// Converts a raw parking_facilities row (Supabase or mock) into the shape
+// expected by LeafletMap markers and ParkingList cards.
+function normaliseSpot(lot, idx) {
+  return {
+    id: lot.id,
+    name: lot.name,
+    address: lot.address ?? '',
+    city: lot.city ?? '',
+    latitude: lot.latitude,
+    longitude: lot.longitude,
+    totalSlots: lot.total_slots,
+    availableSlots: lot.available_slots,
+    pricePerHour: parseFloat(lot.price_per_hour),
+    rating: lot.rating ?? null,
+    hasEVCharging: lot.has_ev_charging,
+    hasCCTV: lot.has_cctv,
+    isCovered: lot.is_covered,
+    isOpen: lot.is_open,
+    distance: 0.3 + idx * 0.25, // approximate — overridden when user geolocation lands
+    vehicleTypes: lot.has_ev_charging ? ['car', 'ev'] : ['car', 'bike'],
+  };
+}
 
-    // Append Leaflet Script
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
-    script.crossOrigin = '';
-    script.onload = () => {
-      resolve(window.L);
-    };
-    document.body.appendChild(script);
-  });
-};
-
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function ParkingMap() {
-  const [L, setL] = useState(null);
-  
-  // Search and Filter states
+  // Search & filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [priceLimit, setPriceLimit] = useState(6.00);
-  const [distanceLimit, setDistanceLimit] = useState(1.5);
+  const [priceLimit, setPriceLimit] = useState(500);
+  const [distanceLimit, setDistanceLimit] = useState(10.0);
   const [selectedVehicle, setSelectedVehicle] = useState('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
-  
+
+  // Data state
   const [selectedParkingId, setSelectedParkingId] = useState(null);
-  const [filteredSpots, setFilteredSpots] = useState(parkingLocations);
+  const [allSpots, setAllSpots] = useState([]);
+  const [filteredSpots, setFilteredSpots] = useState([]);
 
-  const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersLayerRef = useRef(null);
+  // Async state
+  const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState('supabase'); // 'supabase' | 'mock' | 'no-config'
 
-  // 1. Load Leaflet library assets dynamically on mount
+  // 1. Load parking facilities — Supabase first, mock on any failure
   useEffect(() => {
-    loadLeafletAssets().then((leafletInstance) => {
-      setL(leafletInstance);
-    });
+    let cancelled = false;
 
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+    async function loadFacilities() {
+      setIsLoading(true);
+
+      // ── Skip Supabase entirely if not configured ──────────────────────────
+      if (!SUPABASE_CONFIGURED) {
+        console.info(
+          '[ParkingMap] Supabase not configured — loading built-in mock data.'
+        );
+        const spots = mockParkingFacilities.map(normaliseSpot);
+        if (!cancelled) {
+          setAllSpots(spots);
+          setFilteredSpots(spots);
+          setDataSource('no-config');
+          setIsLoading(false);
+        }
+        return;
       }
-    };
+
+      // ── Try Supabase ──────────────────────────────────────────────────────
+      try {
+        const data = await parkingService.fetchLots();
+        const spots = data.map(normaliseSpot);
+        if (!cancelled) {
+          setAllSpots(spots);
+          setFilteredSpots(spots);
+          setDataSource('supabase');
+          setIsLoading(false);
+        }
+      } catch (err) {
+        // ── Supabase failed — fall back to mock data ──────────────────────
+        console.error('[ParkingMap] Supabase fetch failed — using mock data:', err);
+        const spots = mockParkingFacilities.map(normaliseSpot);
+        if (!cancelled) {
+          setAllSpots(spots);
+          setFilteredSpots(spots);
+          setDataSource('mock');
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadFacilities();
+    return () => { cancelled = true; };
   }, []);
 
-  // 2. Initialize Leaflet Map Instance once assets are loaded
+  // 2. Re-filter whenever search/filter controls or base data change
   useEffect(() => {
-    if (!L || mapInstanceRef.current) return;
+    if (allSpots.length === 0) return;
 
-    // Center on SOMA/Financial District SF area based on mock coordinates
-    const map = L.map(mapContainerRef.current, {
-      zoomControl: true,
-      attributionControl: false
-    }).setView([37.7854, -122.4064], 14);
+    const results = allSpots.filter((spot) => {
+      const matchesSearch =
+        spot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        spot.city.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Dark Premium map styles provided by CartoDB
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20
-    }).addTo(map);
-
-    // Create marker layers group container
-    const markersLayer = L.layerGroup().addTo(map);
-
-    mapInstanceRef.current = map;
-    markersLayerRef.current = markersLayer;
-  }, [L]);
-
-  // 3. Filter parking spaces dataset in real-time based on state values
-  useEffect(() => {
-    const results = parkingLocations.filter((spot) => {
-      // Real-time Text Search Filter
-      const matchesSearch = spot.name.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Price range check
       const matchesPrice = spot.pricePerHour <= priceLimit;
-
-      // Distance limit check
       const matchesDistance = spot.distance <= distanceLimit;
+      const matchesVehicle =
+        selectedVehicle === 'all' || spot.vehicleTypes.includes(selectedVehicle);
+      const matchesAvailability =
+        !showAvailableOnly || (spot.availableSlots > 0 && spot.isOpen);
 
-      // Vehicle type check
-      const matchesVehicle = selectedVehicle === 'all' || spot.vehicleTypes.includes(selectedVehicle);
-
-      // Available spaces only check
-      const matchesAvailability = !showAvailableOnly || (spot.availableSlots > 0 && spot.isOpen);
-
-      return matchesSearch && matchesPrice && matchesDistance && matchesVehicle && matchesAvailability;
+      return (
+        matchesSearch &&
+        matchesPrice &&
+        matchesDistance &&
+        matchesVehicle &&
+        matchesAvailability
+      );
     });
 
     setFilteredSpots(results);
-  }, [searchQuery, priceLimit, distanceLimit, selectedVehicle, showAvailableOnly]);
+  }, [searchQuery, priceLimit, distanceLimit, selectedVehicle, showAvailableOnly, allSpots]);
 
-  // 4. Update map markers dynamically when filtered spots or selection state changes
-  useEffect(() => {
-    if (!L || !mapInstanceRef.current || !markersLayerRef.current) return;
-
-    // Clear old markers from map layer group
-    markersLayerRef.current.clearLayers();
-
-    // Map new custom markers
-    filteredSpots.forEach((spot) => {
-      const isSelected = spot.id === selectedParkingId;
-      const markerIcon = createCustomMarkerIcon(L, spot, isSelected);
-
-      const marker = L.marker([spot.latitude, spot.longitude], { icon: markerIcon })
-        .addTo(markersLayerRef.current)
-        .bindPopup(`
-          <div class="popup-inner-card">
-            <h4 class="popup-title">${spot.name}</h4>
-            <div class="popup-meta">
-              <span>${spot.availableSlots === 0 ? 'Full' : `${spot.availableSlots} slots free`}</span>
-              <span>$${spot.pricePerHour.toFixed(2)}/hr</span>
-            </div>
-            <a href="#booking" class="popup-btn">Reserve Space</a>
-          </div>
-        `);
-
-      // Trigger selection on marker click
-      marker.on('click', () => {
-        setSelectedParkingId(spot.id);
-      });
-
-      // Fly-to animation and open popup if card clicked from list
-      if (isSelected) {
-        mapInstanceRef.current.flyTo([spot.latitude, spot.longitude], 15, {
-          animate: true,
-          duration: 1.2
-        });
-        // Delay popup slightly to allow fly-to path to pan
-        setTimeout(() => {
-          if (mapInstanceRef.current) marker.openPopup();
-        }, 1200);
-      }
-    });
-  }, [L, filteredSpots, selectedParkingId]);
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <section className="map-section-container">
-      {/* Left Column: List Column */}
+      {/* Left Column: Filters + Parking List */}
       <ParkingList
         spots={filteredSpots}
         selectedParkingId={selectedParkingId}
@@ -172,9 +152,36 @@ export default function ParkingMap() {
         onToggleAvailable={setShowAvailableOnly}
       />
 
-      {/* Right Column: Interactive Map container */}
+      {/* Right Column: Leaflet / OpenStreetMap interactive map */}
       <div className="map-column-wrapper">
-        <div ref={mapContainerRef} className="leaflet-map-element" />
+        {/* Loading overlay — shown while the first data fetch is in flight */}
+        {isLoading && (
+          <div className="map-loading-overlay">
+            <div className="map-loading-spinner" />
+            <p className="map-loading-text">Loading parking facilities…</p>
+          </div>
+        )}
+
+        {/* Offline / mock-data banner */}
+        {!isLoading && dataSource !== 'supabase' && (
+          <div className="map-data-banner">
+            <span className="map-data-banner-icon">
+              {dataSource === 'no-config' ? 'ℹ️' : '⚠️'}
+            </span>
+            <span className="map-data-banner-text">
+              {dataSource === 'no-config'
+                ? 'Supabase not configured — showing demo parking data.'
+                : 'Using offline demo parking data.'}
+            </span>
+          </div>
+        )}
+
+        {/* The map always renders — even while loading or after an error */}
+        <LeafletMap
+          markers={filteredSpots}
+          selectedId={selectedParkingId}
+          onMarkerClick={setSelectedParkingId}
+        />
       </div>
     </section>
   );

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthLayout from '../components/auth/AuthLayout';
+import { authService } from '../services/authService';
+import { useToast } from '../contexts/ToastContext';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
+  const { showToast } = useToast();
 
   const validateForm = () => {
     const newErrors = {};
@@ -23,34 +26,24 @@ export default function ForgotPassword() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleResetPasswordSubmit = (e) => {
+  const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
-    // Simulate password reset interaction
-    console.log('Sending password reset email to:', email);
-    setIsSubmitted(true);
-
-    /*
-     * TODO: Integrate Supabase Authentication
-     *
-     * Example:
-     * const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-     *   redirectTo: 'http://localhost:5173/reset-password',
-     * });
-     *
-     * if (error) {
-     *   setErrors({ form: error.message });
-     *   setIsSubmitted(false);
-     *   return;
-     * }
-     */
+    try {
+      await authService.resetPassword(email);
+      setIsSubmitted(true);
+      showToast('Reset password email dispatched successfully!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Failed to send recovery link. Please try again.', 'error');
+      setIsSubmitted(false);
+    }
   };
 
   return (
     <AuthLayout>
-      {/* Dynamic Render based on success state */}
       {!isSubmitted ? (
         <>
           {/* Header Info */}
@@ -99,8 +92,7 @@ export default function ForgotPassword() {
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--color-success)',
-              margin: '0 auto 1.5rem auto',
-              boxShadow: '0 0 15px rgba(16, 185, 129, 0.2)'
+              margin: '0 auto 1.5rem auto'
             }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                 <polyline points="20 6 9 17 4 12" />

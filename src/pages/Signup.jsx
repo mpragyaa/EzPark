@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/auth/AuthLayout';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 export default function Signup() {
   const [firstName, setFirstName] = useState('');
@@ -12,6 +14,10 @@ export default function Signup() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   
   const [errors, setErrors] = useState({});
+
+  const { signup } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const validateForm = () => {
     const newErrors = {};
@@ -42,7 +48,6 @@ export default function Signup() {
       if (password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters';
       }
-      // Check for at least one number
       if (!/\d/.test(password)) {
         newErrors.password = 'Password must contain at least one number';
       }
@@ -64,39 +69,20 @@ export default function Signup() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignupSubmit = (e) => {
+  const handleSignupSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
-    // Simulate signup interaction
-    console.log('Registering user:', { firstName, lastName, email, phone, password, agreeTerms });
-    alert(`Account created successfully for: ${email}`);
-
-    /*
-     * TODO: Integrate Supabase Authentication
-     *
-     * Example:
-     * const { data, error } = await supabase.auth.signUp({
-     *   email: email,
-     *   password: password,
-     *   options: {
-     *     data: {
-     *       first_name: firstName,
-     *       last_name: lastName,
-     *       phone_number: phone
-     *     }
-     *   }
-     * });
-     *
-     * if (error) {
-     *   setErrors({ form: error.message });
-     *   return;
-     * }
-     *
-     * // Redirect user to check email or dashboard
-     * navigate('/dashboard');
-     */
+    try {
+      // Sign up and set default role as 'user' (Operators can promote to admin in DB/admin view)
+      await signup(email, password, firstName, lastName, phone, 'user');
+      showToast('Registration successful! Please log in.', 'success');
+      navigate('/login');
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Registration failed. Please check inputs.', 'error');
+    }
   };
 
   return (
@@ -104,7 +90,7 @@ export default function Signup() {
       {/* Header Info */}
       <div className="auth-header">
         <h2 className="auth-title">Create Account</h2>
-        <p className="auth-subtitle">Join the premium AI smart parking space</p>
+        <p className="auth-subtitle">Join the premium AI smart parking platform</p>
       </div>
 
       {/* Signup Form */}

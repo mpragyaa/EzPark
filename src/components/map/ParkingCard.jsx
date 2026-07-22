@@ -54,7 +54,7 @@ export default function ParkingCard({ spot, isSelected, onClick }) {
           fontSize: '0.75rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.2rem'
+          gap: '0.2'
         }}>
           ★ {rating.toFixed(1)}
         </span>
@@ -102,7 +102,7 @@ export default function ParkingCard({ spot, isSelected, onClick }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* Slots Available indicator */}
           <span className={`card-slots-count ${availableSlots === 0 ? 'limited' : availableSlots <= 5 ? 'limited' : ''}`} style={{ fontSize: '0.75rem' }}>
-            {availableSlots === 0 ? 'Full' : `${availableSlots} slots left`}
+            {availableSlots === 0 ? 'Full' : `${availableSlots} spaces left`}
           </span>
 
           {/* Open/Closed Badge */}

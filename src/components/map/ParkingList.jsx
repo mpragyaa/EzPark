@@ -21,7 +21,7 @@ export default function ParkingList({
       
       {/* Header title area */}
       <div className="sidebar-header">
-        <h2 className="sidebar-title">Nearby Parking</h2>
+        <h2 className="sidebar-title">Nearby Facilities</h2>
         <p className="sidebar-subtitle">AI-assisted smart location router</p>
       </div>
 
@@ -30,7 +30,7 @@ export default function ParkingList({
         <input
           type="text"
           className="search-input-field"
-          placeholder="Search location name..."
+          placeholder="Search facility name..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
         />
@@ -140,7 +140,7 @@ export default function ParkingList({
             border: '1px dashed rgba(255, 255, 255, 0.05)',
             borderRadius: '8px'
           }}>
-            No matching spaces found.
+            No matching facilities found.
           </div>
         )}
       </div>

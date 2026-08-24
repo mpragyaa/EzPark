@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react';
 
 export default function Sidebar({ 
@@ -28,6 +29,7 @@ export default function Sidebar({
     { id: 'favorites', label: 'Favorites', icon: Star },
     { id: 'payments', label: 'Payments', icon: CreditCard },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'profile', label: 'My Profile', icon: User },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

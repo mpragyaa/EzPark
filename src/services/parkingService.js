@@ -2,7 +2,7 @@ import { supabase, SUPABASE_AVAILABLE } from './supabase';
 
 export const parkingService = {
   async fetchLots() {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('parking_facilities')
       .select('*')
@@ -11,19 +11,19 @@ export const parkingService = {
     return data;
   },
 
-  async fetchLotById(facilityId) {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+  async fetchLotById(id) {
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('parking_facilities')
       .select('*')
-      .eq('id', facilityId)
+      .eq('id', id)
       .single();
     if (error) throw error;
     return data;
   },
 
   async fetchSlotsForLot(facilityId) {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('parking_slots')
       .select('*')
@@ -34,7 +34,7 @@ export const parkingService = {
   },
 
   async createLot(facilityData) {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('parking_facilities')
       .insert([facilityData])
@@ -44,24 +44,24 @@ export const parkingService = {
     return data;
   },
 
-  async updateLot(facilityId, facilityData) {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+  async updateLot(id, facilityData) {
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase
       .from('parking_facilities')
       .update(facilityData)
-      .eq('id', facilityId)
+      .eq('id', id)
       .select()
       .single();
     if (error) throw error;
     return data;
   },
 
-  async deleteLot(facilityId) {
-    if (!SUPABASE_AVAILABLE) throw new Error('Supabase not configured');
+  async deleteLot(id) {
+    if (!SUPABASE_AVAILABLE || !supabase) throw new Error('Supabase not configured');
     const { error } = await supabase
       .from('parking_facilities')
       .delete()
-      .eq('id', facilityId);
+      .eq('id', id);
     if (error) throw error;
   }
 };

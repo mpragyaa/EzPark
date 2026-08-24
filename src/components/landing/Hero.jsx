@@ -86,7 +86,7 @@ export default function Hero() {
   };
 
   const handleScrollToSearch = () => {
-    const el = document.querySelector('.search-section-container');
+    const el = document.querySelector('.map-section-container');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }

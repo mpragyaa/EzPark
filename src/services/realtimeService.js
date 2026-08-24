@@ -1,13 +1,11 @@
-import { supabase } from './supabase';
+import { supabase, SUPABASE_AVAILABLE } from './supabase';
 
 export const realtimeService = {
-  /**
-   * Subscribes to Postgres alterations on parking_slots table.
-   * @param {string} facilityId - ID of parking facility
-   * @param {Function} onUpdate - callback triggered on insert/update/delete events
-   * @param {Function} onStatusChange - callback triggered on socket state changes
-   */
   subscribeToSlots(facilityId, onUpdate, onStatusChange) {
+    if (!SUPABASE_AVAILABLE || !supabase) {
+      if (onStatusChange) onStatusChange('CLOSED', new Error('Supabase not configured'));
+      return null;
+    }
     const channel = supabase
       .channel(`live-slots-${facilityId}`)
       .on(
@@ -33,13 +31,11 @@ export const realtimeService = {
     return channel;
   },
 
-  /**
-   * Subscribes to active booking logs.
-   * @param {string} userId - Optional user ID to filter bookings
-   * @param {Function} onUpdate - callback on booking shifts
-   * @param {Function} onStatusChange - connection status callback
-   */
   subscribeToBookings(userId, onUpdate, onStatusChange) {
+    if (!SUPABASE_AVAILABLE || !supabase) {
+      if (onStatusChange) onStatusChange('CLOSED', new Error('Supabase not configured'));
+      return null;
+    }
     const filterStr = userId ? `user_id=eq.${userId}` : undefined;
     
     const channel = supabase
@@ -67,9 +63,34 @@ export const realtimeService = {
     return channel;
   },
 
+  subscribeToNotifications(userId, onUpdate, onStatusChange) {
+    if (!SUPABASE_AVAILABLE || !supabase) {
+      if (onStatusChange) onStatusChange('CLOSED', new Error('Supabase not configured'));
+      return null;
+    }
+    const channel = supabase
+      .channel(`live-notifs-${userId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        onUpdate
+      );
+
+    channel.subscribe((status, err) => {
+      if (onStatusChange) onStatusChange(status, err);
+    });
+
+    return channel;
+  },
+
   // Gracefully unsubscribe from any active channel
   unsubscribe(channel) {
-    if (channel) {
+    if (channel && SUPABASE_AVAILABLE && supabase) {
       supabase.removeChannel(channel);
     }
   }

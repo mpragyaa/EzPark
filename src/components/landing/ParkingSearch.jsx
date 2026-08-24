@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { parkingService } from '../../services/parkingService';
+import { useBooking } from '../../contexts/BookingContext';
 import '../../styles/parking-search.css';
 
 export default function ParkingSearch() {
-  const [destination, setDestination] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [vehicleType, setVehicleType] = useState('car');
+  const {
+    destination,
+    setDestination,
+    date,
+    setDate,
+    time,
+    setTime,
+    vehicleType,
+    setVehicleType,
+    setSelectedFacility,
+  } = useBooking();
   
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -261,6 +269,14 @@ export default function ParkingSearch() {
                       className="parking-card"
                       variants={cardVariants}
                       whileHover={{ scale: 1.015 }}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        setSelectedFacility(spot);
+                        setTimeout(() => {
+                          const el = document.querySelector('.booking-section-container');
+                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                      }}
                     >
                       <div className="card-info">
                         <div className="card-title-row">

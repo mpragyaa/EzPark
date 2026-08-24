@@ -2,38 +2,63 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBooking } from '../../contexts/BookingContext';
 import { useToast } from '../../contexts/ToastContext';
 import { parkingService } from '../../services/parkingService';
 import { bookingService } from '../../services/bookingService';
+import { formatDateLabel, formatTimeLabel } from '../../utils/formatters';
 import useRealtimeSlots from '../../hooks/useRealtime';
 import '../../styles/booking.css';
+
+// Helper to compute departure time based on arrival time and duration (hours)
+function addHoursToTime(timeStr, hours) {
+  if (!timeStr) return '18:00';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+
+  const totalMins = (h + parseFloat(hours)) * 60 + m;
+  const newHrs = Math.floor(totalMins / 60) % 24;
+  const newMins = Math.round(totalMins % 60);
+
+  return `${newHrs.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
+}
 
 export default function BookingSection() {
   const { user, isAuthenticated } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  // Selected details
+  // Centralised booking state context
+  const {
+    selectedFacility,
+    setSelectedFacility,
+    vehicleType,
+    date,
+    time,
+    duration,
+    destination,
+  } = useBooking();
+
   const [facilities, setFacilities] = useState([]);
-  const [selectedFacility, setSelectedFacility] = useState(null);
-  
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
-
-  // Form states
-  const [vehicleType, setVehicleType] = useState('car');
-  const [date, setDate] = useState('2026-07-18');
-  const [entryTime, setEntryTime] = useState('09:00');
-  const [exitTime, setExitTime] = useState('14:00');
   const [invoice, setInvoice] = useState(null);
 
-  // Load facilities from Supabase
+  // Auto-derived times
+  const entryTime = time;
+  const exitTime = addHoursToTime(time, duration);
+
+  // Load facilities from Supabase on mount
   useEffect(() => {
     const loadFacilities = async () => {
       try {
         const data = await parkingService.fetchLots();
         setFacilities(data);
-        if (data.length > 0) {
+        // Default to first facility if none selected yet
+        if (data.length > 0 && !selectedFacility) {
           setSelectedFacility(data[0]);
         }
       } catch (err) {
@@ -41,7 +66,7 @@ export default function BookingSection() {
       }
     };
     loadFacilities();
-  }, []);
+  }, [selectedFacility, setSelectedFacility]);
 
   // Load slots when selected facility changes
   useEffect(() => {
@@ -51,7 +76,7 @@ export default function BookingSection() {
       try {
         const data = await parkingService.fetchSlotsForLot(selectedFacility.id);
         setSlots(data);
-        // Auto-select first available slot of matching vehicle type
+        // Auto-select first available slot
         const match = data.find(s => s.status === 'available');
         setSelectedSlot(match || null);
       } catch (err) {
@@ -64,31 +89,21 @@ export default function BookingSection() {
   // Hook up live Supabase Realtime channel listener
   const liveSlots = useRealtimeSlots(selectedFacility?.id, slots);
 
-  // Auto-select a valid available slot if the currently selected slot becomes reserved/occupied in realtime
+  // Auto-select a valid available slot if selectedSlot status changes
   useEffect(() => {
     if (selectedSlot && liveSlots.length > 0) {
       const match = liveSlots.find(s => s.id === selectedSlot.id);
       if (match && match.status !== 'available') {
-        // Current slot is no longer available! Fallback to next available slot
         const nextAvail = liveSlots.find(s => s.status === 'available');
         setSelectedSlot(nextAvail || null);
         showToast(`Slot ${selectedSlot.slot_number} was booked by another user. Selecting next available.`, 'error');
       }
     }
-  }, [liveSlots, selectedSlot]);
+  }, [liveSlots, selectedSlot, showToast]);
 
-  // Calculations
   const calculateTotal = () => {
     if (!selectedFacility) return 0;
-    const [entryH, entryM] = entryTime.split(':').map(Number);
-    const [exitH, exitM] = exitTime.split(':').map(Number);
-    
-    const entryMin = entryH * 60 + entryM;
-    const exitMin = exitH * 60 + exitM;
-    const diffMin = Math.max(exitMin - entryMin, 60); // min 1 hour
-    const hrs = diffMin / 60;
-    
-    return hrs * selectedFacility.price_per_hour;
+    return (duration ?? 2) * parseFloat(selectedFacility.price_per_hour);
   };
 
   const handleBookingSubmit = async (e) => {
@@ -106,11 +121,8 @@ export default function BookingSection() {
     }
 
     try {
-      const [entryH, entryM] = entryTime.split(':').map(Number);
-      const [exitH, exitM] = exitTime.split(':').map(Number);
-      const durationHours = Math.max((exitH * 60 + exitM - (entryH * 60 + entryM)) / 60, 1);
       const rate = selectedFacility.price_per_hour;
-      const totalAmount = durationHours * rate;
+      const totalAmount = duration * rate;
 
       // Submit booking details to Supabase Service
       const bookingData = {
@@ -124,7 +136,6 @@ export default function BookingSection() {
         total_amount: totalAmount
       };
 
-      // Calls service which locks slots in DB and inserts row
       const bookingResult = await bookingService.createBooking(bookingData);
 
       // Create modal receipt state
@@ -133,10 +144,10 @@ export default function BookingSection() {
         facilityName: selectedFacility.name,
         slotName: selectedSlot.slot_number,
         date,
-        time: `${entryTime} - ${exitTime}`,
-        hours: `${durationHours.toFixed(1)} hrs`,
-        rate: `$${rate.toFixed(2)}/hr`,
-        total: `$${totalAmount.toFixed(2)}`
+        time: `${formatTimeLabel(entryTime)} - ${formatTimeLabel(exitTime)}`,
+        hours: `${duration} hrs`,
+        rate: `₹${parseFloat(rate).toFixed(2)}/hr`,
+        total: `₹${totalAmount.toFixed(2)}`
       });
 
       showToast('Booking reserved successfully!', 'success');
@@ -147,7 +158,12 @@ export default function BookingSection() {
     }
   };
 
-  // Performance Optimization: Memoize slot grid layouts to prevent recalculations on unrelated renders
+  const handleEditSearch = () => {
+    const el = document.querySelector('.search-section-container');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Memoize slot grid layouts to prevent recalculations on unrelated renders
   const slotsMapGrid = useMemo(() => {
     if (liveSlots.length === 0) {
       return (
@@ -161,8 +177,6 @@ export default function BookingSection() {
       const isSelected = selectedSlot?.id === s.id;
       const isReserved = s.status !== 'available';
 
-      // Color coding details:
-      // Green = Available, Blue = Reserved, Red = Occupied, Orange = Maintenance, Gray = Unavailable
       let statusColor = 'rgba(255, 255, 255, 0.01)';
       if (isSelected) {
         statusColor = 'var(--color-primary)';
@@ -216,8 +230,26 @@ export default function BookingSection() {
         <div className="booking-info-column">
           {selectedFacility ? (
             <div className="facility-detail-card">
-              <h3 className="facility-name">{selectedFacility.name}</h3>
-              <p className="facility-address">{selectedFacility.address}, {selectedFacility.city}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 className="facility-name">{selectedFacility.name}</h3>
+                  <p className="facility-address">{selectedFacility.address}, {selectedFacility.city}</p>
+                </div>
+                {/* Fallback Selector for testing different lots directly on the booking pane */}
+                <select
+                  className="form-input"
+                  value={selectedFacility.id}
+                  onChange={(e) => {
+                    const found = facilities.find(f => f.id === e.target.value);
+                    if (found) setSelectedFacility(found);
+                  }}
+                  style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                >
+                  {facilities.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
               
               <div className="facility-amenities-row">
                 {selectedFacility.has_ev_charging && <span className="amenity-tag">🔋 EV Charging</span>}
@@ -242,102 +274,119 @@ export default function BookingSection() {
             </div>
           ) : (
             <div className="facility-detail-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}>
-              <p style={{ color: 'var(--text-muted)' }}>Loading parking lots database...</p>
+              <p style={{ color: 'var(--text-muted)' }}>Select a facility from the search results above to inspect slot maps.</p>
             </div>
           )}
         </div>
 
-        {/* Right Column: Reservation form */}
+        {/* Right Column: Streamlined Booking Form (No duplicate vehicle/date/time inputs) */}
         <form className="booking-panel-card" onSubmit={handleBookingSubmit}>
-          <h3 className="panel-card-title">Reservation Form</h3>
+          <h3 className="panel-card-title">Booking Summary</h3>
 
-          {/* Select Lot Facility */}
-          <div className="form-group">
-            <label className="form-label">Parking Location</label>
-            <select
-              className="form-input"
-              value={selectedFacility?.id || ''}
-              onChange={(e) => {
-                const found = facilities.find(f => f.id === e.target.value);
-                if (found) setSelectedFacility(found);
-              }}
-              style={{ width: '100%' }}
-            >
-              {facilities.map(f => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Vehicle Segment Selector */}
-          <div className="form-group">
-            <label className="form-label">Vehicle Type</label>
-            <div className="vehicle-selector-row">
-              {['car', 'bike', 'ev'].map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`vehicle-btn ${vehicleType === type ? 'active' : ''}`}
-                  onClick={() => setVehicleType(type)}
-                >
-                  <span style={{ textTransform: 'capitalize' }}>{type}</span>
-                </button>
-              ))}
+          {/* Structured Booking Summary Card */}
+          <div className="pd-summary-box" style={{
+            backgroundColor: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Destination</span>
+              <strong style={{ color: 'var(--text-primary)', maxWidth: '65%', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {destination || 'N/A'}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Vehicle Type</span>
+              <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                {vehicleType}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Date</span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {formatDateLabel(date)}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Arrival Time</span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {formatTimeLabel(entryTime)}
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Duration</span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {duration} {duration === 1 ? 'Hour' : 'Hours'}
+              </strong>
             </div>
           </div>
 
-          {/* Date Selector */}
-          <div className="form-group">
-            <label className="form-label">Date</label>
-            <input
-              type="date"
-              className="form-input"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+          {/* Edit Search button to return to search panel */}
+          <button
+            type="button"
+            className="btn-submit"
+            onClick={handleEditSearch}
+            style={{
+              backgroundColor: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              marginBottom: '1rem',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit Search Criteria
+          </button>
+
+          {/* Selected Slot Information */}
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Selected Space</label>
+            <div style={{
+              backgroundColor: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.65rem 1rem',
+              color: selectedSlot ? 'var(--text-primary)' : 'var(--color-error)',
+              fontWeight: 700,
+              fontSize: '0.9rem'
+            }}>
+              {selectedSlot ? `Slot ${selectedSlot.slot_number} (${selectedSlot.type.toUpperCase()})` : 'Please select a slot block on the level map'}
+            </div>
           </div>
 
-          {/* Hours segment */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Arrival Time</label>
-              <input
-                type="time"
-                className="form-input"
-                value={entryTime}
-                onChange={(e) => setEntryTime(e.target.value)}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Departure Time</label>
-              <input
-                type="time"
-                className="form-input"
-                value={exitTime}
-                onChange={(e) => setExitTime(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Bottom summaries & submit */}
+          {/* Pricing summaries & Book Now button */}
           {selectedFacility && (
-            <div className="total-summary-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Hourly Price Rate</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>${parseFloat(selectedFacility.price_per_hour).toFixed(2)}/hr</span>
+            <div className="total-summary-card" style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Hourly Price Rate</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>₹{parseFloat(selectedFacility.price_per_hour).toFixed(2)}/hr</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.6rem' }}>
                 <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Estimated Total Price</span>
-                <span style={{ color: 'var(--color-success)', fontWeight: 800 }}>${calculateTotal().toFixed(2)}</span>
+                <span style={{ color: 'var(--color-success)', fontWeight: 800 }}>₹{calculateTotal().toFixed(2)}</span>
               </div>
             </div>
           )}
 
-          <button type="submit" className="btn-submit" style={{ width: '100%' }}>
-            Book Space
+          <button
+            type="submit"
+            className="btn-submit"
+            style={{ width: '100%' }}
+            disabled={!selectedSlot}
+          >
+            Confirm Reservation
           </button>
         </form>
 

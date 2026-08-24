@@ -1,4 +1,3 @@
-const ParkingMap = lazy(() => import('./components/map/ParkingMap'));
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -30,36 +29,39 @@ const LoadingScreen = () => (
   </main>
 );
 
+import { BookingProvider } from './contexts/BookingContext';
+
 function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <RealtimeProvider>
-          <BrowserRouter>
-            <Suspense fallback={<LoadingScreen />}>
-              <Routes>
-                {/* Public Pages */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/map" element={<ParkingMap />} />
+    <BookingProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <RealtimeProvider>
+            <BrowserRouter>
+              <Suspense fallback={<LoadingScreen />}>
+                <Routes>
+                  {/* Public Pages */}
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
 
-                {/* Secure Customer Portal */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/dashboard" element={<UserDashboard />} />
-                </Route>
+                  {/* Secure Customer Portal */}
+                  <Route element={<ProtectedRoute />}>
+                    <Route path="/dashboard" element={<UserDashboard />} />
+                  </Route>
 
-                {/* Secure Admin Console */}
-                <Route element={<ProtectedRoute adminOnly={true} />}>
-                  <Route path="/operator" element={<AdminDashboard />} />
-                </Route>
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </RealtimeProvider>
-      </AuthProvider>
-    </ToastProvider>
+                  {/* Secure Admin Console */}
+                  <Route element={<ProtectedRoute adminOnly={true} />}>
+                    <Route path="/operator" element={<AdminDashboard />} />
+                  </Route>
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </RealtimeProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </BookingProvider>
   );
 }
 

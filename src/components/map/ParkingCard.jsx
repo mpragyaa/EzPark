@@ -1,10 +1,17 @@
 import React, { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-export default function ParkingCard({ spot, isSelected, onClick }) {
+export default function ParkingCard({
+  spot,
+  isSelected,
+  onClick,
+  showDistance = false,
+  isFavorite = false,
+  onToggleFavorite,
+}) {
   const {
     name,
-    distance,
+    distanceKm,
     pricePerHour,
     availableSlots,
     totalSlots,
@@ -41,34 +48,65 @@ export default function ParkingCard({ spot, isSelected, onClick }) {
       onClick={onClick}
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
+      style={{ position: 'relative' }}
     >
+      {/* Favorite Heart Toggle Icon */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite?.(spot.id);
+        }}
+        style={{
+          position: 'absolute',
+          top: '0.85rem',
+          right: '0.85rem',
+          color: isFavorite ? '#ef4444' : 'var(--text-muted)',
+          zIndex: 10,
+          transition: 'transform 0.2s ease, color 0.2s ease',
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1.0)'}
+        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+      </button>
+
       {/* Title & Rating */}
-      <div className="card-header-row">
+      <div className="card-header-row" style={{ paddingRight: '2rem' }}>
         <h3 className="card-title">{name}</h3>
-        <span className="badge-status open" style={{
-          backgroundColor: 'rgba(255, 184, 0, 0.08)',
-          border: '1px solid rgba(255, 184, 0, 0.2)',
-          color: '#ffb800',
-          padding: '0.2rem 0.5rem',
-          borderRadius: '4px',
-          fontSize: '0.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.2'
-        }}>
-          ★ {rating.toFixed(1)}
-        </span>
+        {rating != null && (
+          <span className="badge-status open" style={{
+            backgroundColor: 'rgba(255, 184, 0, 0.08)',
+            border: '1px solid rgba(255, 184, 0, 0.2)',
+            color: '#ffb800',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '4px',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.2'
+          }}>
+            ★ {Number(rating).toFixed(1)}
+          </span>
+        )}
       </div>
 
       {/* Distance and EV stats */}
       <div className="card-meta-line">
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          {distance.toFixed(1)} miles
-        </span>
+        {showDistance && distanceKm != null ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            {distanceKm < 1
+              ? `${Math.round(distanceKm * 1000)} m away`
+              : `${distanceKm.toFixed(1)} km away`}
+          </span>
+        ) : null}
         
         {hasEVCharging && (
           <>
@@ -93,16 +131,33 @@ export default function ParkingCard({ spot, isSelected, onClick }) {
         )}
       </div>
 
+      {/* Live Occupancy Progress Bar */}
+      <div className="card-occupancy-progress" style={{ marginTop: '0.65rem', marginBottom: '0.2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', fontWeight: 500 }}>
+          <span>Occupancy</span>
+          <span>{Math.round((1 - occupancyRatio) * 100)}%</span>
+        </div>
+        <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{
+            width: `${Math.max(0, Math.min(100, (1 - occupancyRatio) * 100))}%`,
+            height: '100%',
+            backgroundColor: availableSlots === 0 ? 'var(--color-error)' : occupancyRatio <= 0.15 ? 'var(--color-warning, #f59e0b)' : 'var(--color-success)',
+            borderRadius: '2px',
+            transition: 'width 0.4s ease'
+          }} />
+        </div>
+      </div>
+
       {/* Footer statistics (price & slots) */}
-      <div className="card-footer-row">
+      <div className="card-footer-row" style={{ marginTop: '0.4rem' }}>
         <div className="card-price-value">
-          ${pricePerHour.toFixed(2)}<span>/hr</span>
+          ₹{pricePerHour.toFixed(2)}<span>/hr</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* Slots Available indicator */}
           <span className={`card-slots-count ${availableSlots === 0 ? 'limited' : availableSlots <= 5 ? 'limited' : ''}`} style={{ fontSize: '0.75rem' }}>
-            {availableSlots === 0 ? 'Full' : `${availableSlots} spaces left`}
+            {availableSlots === 0 ? 'Full' : `${availableSlots}/${totalSlots ?? '?'} free`}
           </span>
 
           {/* Open/Closed Badge */}

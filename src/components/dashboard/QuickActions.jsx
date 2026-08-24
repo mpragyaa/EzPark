@@ -1,25 +1,42 @@
+/**
+ * QuickActions.jsx
+ *
+ * Renders quick shortcut links inside the dashboard panel.
+ * Integrates router navigation to guide the user back to the interactive homepage map.
+ */
+
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PlusCircle, Compass, History, ChevronRight } from 'lucide-react';
 
-export default function QuickActions() {
+export default function QuickActions({ onTabChange }) {
+  const navigate = useNavigate();
+
   const actions = [
     {
       label: 'Reserve Parking',
       description: 'Book a new space',
       icon: PlusCircle,
-      action: () => alert('Opening Reservation Flow...')
+      action: () => navigate('/')
     },
     {
       label: 'Open Map Router',
       description: 'View real-time coordinates',
       icon: Compass,
-      action: () => alert('Loading Smart Map...')
+      action: () => navigate('/')
     },
     {
       label: 'Booking History',
       description: 'Review receipts & bookings',
       icon: History,
-      action: () => alert('Loading History Archive...')
+      action: () => {
+        if (onTabChange) {
+          onTabChange('bookings');
+        } else {
+          // Fallback
+          navigate('/dashboard');
+        }
+      }
     }
   ];
 

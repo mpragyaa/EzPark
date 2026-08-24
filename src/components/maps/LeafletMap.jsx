@@ -1,65 +1,27 @@
 /**
- * LeafletMap — Reusable interactive map component for EzPark.
+ * LeafletMap.jsx
  *
- * Built with react-leaflet v4 + Leaflet + OpenStreetMap tiles.
- * No API key required. All parking facility data comes via props
- * so the parent (ParkingMap) can swap in live Supabase data at any time.
- *
- * Props
- * ─────
- *   markers       {Array}    Parking spot objects. Expected shape:
- *                              { id, name, address?, latitude, longitude,
- *                                availableSlots, totalSlots, pricePerHour,
- *                                rating?, isOpen? }
- *   selectedId    {any}      ID of the currently selected spot.
- *                            The matching marker is highlighted and the map
- *                            pans to it automatically.
- *   onMarkerClick {Function} Called with (spotId) when a marker is clicked.
- *   className     {string}   Optional extra CSS class on the outer wrapper.
- *   style         {Object}   Optional inline style overrides on the wrapper.
+ * Interactive Leaflet + OpenStreetMap map.
+ * Contains markers, popups, auto-pans, and Geolocation checks.
+ * Optimized to prevent zero-height collapse and marker redraw lag.
  */
-import 'leaflet/dist/leaflet.css';
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMap,
-} from 'react-leaflet';
+
+import React, { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-
-// ─── Fix Leaflet's broken default icon paths under Vite / Webpack ──────────
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-});
+import 'leaflet/dist/leaflet.css';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-// Geographic centre of India
-const INDIA_CENTER = [20.5937, 78.9629];
-const DEFAULT_ZOOM = 5;
-const USER_ZOOM = 13;
+// Fallback city center (Delhi, India)
+const DELHI_CENTER = [28.6139, 77.2090];
+const DEFAULT_ZOOM = 11;
+const USER_ZOOM = 14;
 
-// OpenStreetMap tile layer — free, no key required
 const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
 
 // ─── Custom SVG marker factory ────────────────────────────────────────────────
-/**
- * Build a Leaflet DivIcon with a coloured SVG pin that reflects slot availability.
- *   Green  → many slots available  (> 5)
- *   Amber  → limited slots         (1–5)
- *   Red    → full                  (0)
- * Selected markers are larger with a white ring.
- */
 function buildMarkerIcon(spot, isSelected) {
   const { availableSlots } = spot;
 
@@ -73,7 +35,7 @@ function buildMarkerIcon(spot, isSelected) {
   const outerR = isSelected ? 14 : 10;
   const innerR = isSelected ? 8 : 6;
   const ringWidth = isSelected ? 3 : 0;
-  const size = (outerR + ringWidth) * 2 + 4; // canvas size
+  const size = (outerR + ringWidth) * 2 + 4;
   const cx = size / 2;
 
   const svg = `
@@ -87,7 +49,7 @@ function buildMarkerIcon(spot, isSelected) {
     </svg>`;
 
   return L.divIcon({
-    className: '', // suppress leaflet-div-icon default white box
+    className: 'custom-map-marker-svg',
     html: svg,
     iconSize: [size, size],
     iconAnchor: [cx, cx],
@@ -95,23 +57,62 @@ function buildMarkerIcon(spot, isSelected) {
   });
 }
 
-// ─── Internal: map controller sub-component ──────────────────────────────────
-/**
- * MapController sits inside <MapContainer> and reacts to prop changes.
- * It handles:
- *   1. One-time geolocation request after mount.
- *   2. Fly-to animation whenever `selectedId` changes.
- */
-function MapController({ markers, selectedId, onGeolocated }) {
+// ─── Memory-efficient Marker Icon Cache ──────────────────────────────────────
+const iconCache = new Map();
+
+function getCachedMarkerIcon(spot, isSelected) {
+  const key = `${spot.id}-${isSelected}-${spot.availableSlots}`;
+  if (iconCache.has(key)) {
+    return iconCache.get(key);
+  }
+  const icon = buildMarkerIcon(spot, isSelected);
+  iconCache.set(key, icon);
+  return icon;
+}
+
+// ─── Destination marker icon (teardrop pin) ──────────────────────────────────
+const DEST_ICON = L.divIcon({
+  className: 'custom-destination-marker-svg',
+  html: `
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
+      <path d="M14 0 C6.268 0 0 6.268 0 14 C0 24.5 14 36 14 36 C14 36 28 24.5 28 14 C28 6.268 21.732 0 14 0Z"
+            fill="#3b82f6" stroke="#ffffff" stroke-width="2"/>
+      <circle cx="14" cy="14" r="5" fill="#ffffff"/>
+    </svg>`,
+  iconSize: [28, 36],
+  iconAnchor: [14, 36],
+  popupAnchor: [0, -38],
+});
+
+// ─── Pulsing blue "You are here" user marker icon ────────────────────────────
+const USER_LOC_ICON = L.divIcon({
+  className: 'custom-user-location-marker-svg',
+  html: `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" fill="#3B82F6" stroke="#ffffff" stroke-width="2.5" />
+      <circle cx="12" cy="12" r="8" fill="#3B82F6" opacity="0.35">
+        <animate attributeName="r" values="8;12;8" dur="1.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.35;0;0.35" dur="1.8s" repeatCount="indefinite"/>
+      </circle>
+    </svg>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
+// ─── Internal Map Controller ─────────────────────────────────────────────────
+function MapController({ markers, selectedId, centerOn, onGeolocated, onGeolocationDenied, markerRefs }) {
   const map = useMap();
   const geolocatedRef = useRef(false);
 
-  // Geolocation — runs once after the map mounts
+  // Request browser geolocation on mount
   useEffect(() => {
     if (geolocatedRef.current) return;
     geolocatedRef.current = true;
 
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      onGeolocationDenied?.();
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -120,67 +121,131 @@ function MapController({ markers, selectedId, onGeolocated }) {
         onGeolocated?.(userLatLng);
       },
       () => {
-        // Permission denied or unavailable — stay on India default
+        // Geolocation failed or permission denied — fly to Delhi fallback
+        map.flyTo(DELHI_CENTER, DEFAULT_ZOOM, { animate: true, duration: 1.2 });
+        onGeolocationDenied?.();
       },
       { timeout: 8000 }
     );
-  }, [map, onGeolocated]);
+  }, [map, onGeolocated, onGeolocationDenied]);
 
-  // Pan to selected marker
+  // Fly to selected parking marker and programmatically open popup
   useEffect(() => {
     if (selectedId == null) return;
     const spot = markers.find((s) => s.id === selectedId);
     if (!spot) return;
+
     map.flyTo([spot.latitude, spot.longitude], Math.max(map.getZoom(), 14), {
       animate: true,
       duration: 1.0,
     });
-  }, [selectedId, markers, map]);
+
+    // Programmatically open the marker popup on card select
+    setTimeout(() => {
+      const activeMarker = markerRefs.current[selectedId];
+      if (activeMarker) {
+        activeMarker.openPopup();
+      }
+    }, 350);
+  }, [selectedId, markers, map, markerRefs]);
+
+  // Fly to location selected from Places autocomplete
+  useEffect(() => {
+    if (!centerOn) return;
+    map.flyTo([centerOn.lat, centerOn.lng], USER_ZOOM, { animate: true, duration: 1.2 });
+  }, [centerOn, map]);
 
   return null;
 }
 
-// ─── Main exported component ──────────────────────────────────────────────────
+// ─── Destination Marker Sub-component ────────────────────────────────────────
+function DestinationMarker({ location }) {
+  if (!location) return null;
+  return (
+    <Marker position={[location.lat, location.lng]} icon={DEST_ICON} zIndexOffset={2000}>
+      <Popup className="lmap-popup" minWidth={180}>
+        <div className="lmap-popup-card">
+          <div className="lmap-popup-header">
+            <h4 className="lmap-popup-title">📍 {location.label}</h4>
+          </div>
+          <p className="lmap-popup-address" style={{ marginTop: '0.25rem' }}>
+            Searched destination
+          </p>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
+// ─── Main Exported Component ─────────────────────────────────────────────────
 export default function LeafletMap({
   markers = [],
   selectedId = null,
   onMarkerClick,
+  centerOn = null,
+  destinationMarker = null,
+  userLocation = null,
+  onGeolocated,
+  onGeolocationDenied,
   className = '',
   style = {},
 }) {
   const [geoError, setGeoError] = useState(false);
-
-  // Geolocation permission check (best-effort, non-blocking)
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoError(true);
-    }
-  }, []);
+  const markerRefs = useRef({});
 
   return (
-    <div className={`lmap-root ${className}`} style={style}>
+    <div
+      className={`leaflet-map-element ${className}`}
+      style={{
+        height: '100%',
+        width: '100%',
+        position: 'relative',
+        ...style,
+      }}
+    >
       <MapContainer
-        center={INDIA_CENTER}
+        center={DELHI_CENTER}
         zoom={DEFAULT_ZOOM}
-        className="lmap-canvas"
+        style={{
+          height: '100%',
+          width: '100%',
+          outline: 'none',
+        }}
         zoomControl={true}
         attributionControl={true}
         scrollWheelZoom={true}
       >
-        {/* OpenStreetMap tile layer */}
         <TileLayer url={OSM_TILE_URL} attribution={OSM_ATTRIBUTION} maxZoom={19} />
 
-        {/* Pan-to controller + geolocation */}
         <MapController
           markers={markers}
           selectedId={selectedId}
-          onGeolocated={null}
+          centerOn={centerOn}
+          onGeolocated={onGeolocated}
+          onGeolocationDenied={() => {
+            setGeoError(true);
+            onGeolocationDenied?.();
+          }}
+          markerRefs={markerRefs}
         />
+
+        {/* Pulsing blue "You are here" user location marker */}
+        {userLocation && (
+          <Marker position={userLocation} icon={USER_LOC_ICON} zIndexOffset={3000}>
+            <Popup className="lmap-popup" minWidth={100}>
+              <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                📍 You are here
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        <DestinationMarker location={destinationMarker} />
 
         {/* Parking markers */}
         {markers.map((spot) => {
           const isSelected = spot.id === selectedId;
-          const icon = buildMarkerIcon(spot, isSelected);
+          const icon = getCachedMarkerIcon(spot, isSelected);
           const slotsLabel =
             spot.availableSlots === 0
               ? 'Full'
@@ -189,6 +254,13 @@ export default function LeafletMap({
           return (
             <Marker
               key={spot.id}
+              ref={(ref) => {
+                if (ref) {
+                  markerRefs.current[spot.id] = ref;
+                } else {
+                  delete markerRefs.current[spot.id];
+                }
+              }}
               position={[spot.latitude, spot.longitude]}
               icon={icon}
               zIndexOffset={isSelected ? 1000 : 0}
@@ -198,31 +270,23 @@ export default function LeafletMap({
             >
               <Popup className="lmap-popup" minWidth={220} maxWidth={260}>
                 <div className="lmap-popup-card">
-                  {/* Header */}
                   <div className="lmap-popup-header">
                     <h4 className="lmap-popup-title">{spot.name}</h4>
                     {spot.isOpen !== undefined && (
-                      <span
-                        className={`lmap-popup-badge ${spot.isOpen ? 'open' : 'closed'}`}
-                      >
+                      <span className={`lmap-popup-badge ${spot.isOpen ? 'open' : 'closed'}`}>
                         {spot.isOpen ? 'Open' : 'Closed'}
                       </span>
                     )}
                   </div>
 
-                  {/* Address */}
                   {spot.address && (
                     <p className="lmap-popup-address">{spot.address}</p>
                   )}
 
-                  {/* Stats grid */}
                   <div className="lmap-popup-stats">
                     <div className="lmap-popup-stat">
                       <span className="lmap-popup-stat-label">Slots</span>
-                      <span
-                        className={`lmap-popup-stat-value ${spot.availableSlots === 0 ? 'lmap-stat-red' : 'lmap-stat-green'
-                          }`}
-                      >
+                      <span className={`lmap-popup-stat-value ${spot.availableSlots === 0 ? 'lmap-stat-red' : 'lmap-stat-green'}`}>
                         {slotsLabel}
                       </span>
                     </div>
@@ -243,11 +307,6 @@ export default function LeafletMap({
                       </div>
                     )}
                   </div>
-
-                  {/* Reserve button */}
-                  <a href="#booking" className="lmap-popup-btn">
-                    Reserve Space
-                  </a>
                 </div>
               </Popup>
             </Marker>
@@ -255,10 +314,25 @@ export default function LeafletMap({
         })}
       </MapContainer>
 
-      {/* Subtle geolocation-unavailable notice (non-blocking) */}
+      {/* Geolocation denied banner overlay */}
       {geoError && (
-        <div className="lmap-geo-notice">
-          📍 Geolocation unavailable — showing India
+        <div className="lmap-geo-notice" style={{
+          backgroundColor: 'var(--color-error-glow)',
+          border: '1px solid var(--color-error)',
+          color: '#ffffff',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: '0.78rem',
+          padding: '0.55rem 0.9rem',
+          zIndex: 1000,
+          position: 'absolute',
+          bottom: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          boxShadow: 'var(--shadow-md)',
+          textAlign: 'center',
+          pointerEvents: 'none'
+        }}>
+          ⚠️ Location permission is required for nearby parking. Fallback to Delhi.
         </div>
       )}
     </div>

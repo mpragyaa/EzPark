@@ -1,5 +1,8 @@
 import React from 'react';
 import ParkingCard from './ParkingCard';
+import PlacesSearch from './PlacesSearch';
+import { SEARCH_RADII_KM } from '../../services/parkingSearchService';
+import { useBooking } from '../../contexts/BookingContext';
 
 export default function ParkingList({
   spots,
@@ -7,42 +10,152 @@ export default function ParkingList({
   onCardClick,
   searchQuery,
   onSearchChange,
+  onLocationSelect,
   priceLimit,
   onPriceChange,
-  distanceLimit,
-  onDistanceChange,
   selectedVehicle,
   onVehicleChange,
   showAvailableOnly,
-  onToggleAvailable
+  onToggleAvailable,
+  // Proximity props
+  selectedLocation,
+  searchRadius,
+  onRadiusChange,
+  // Favorites props
+  favorites = [],
+  onToggleFavorite,
 }) {
+  const {
+    date,
+    setDate,
+    time,
+    setTime,
+    duration,
+    setDuration,
+  } = useBooking();
+  // ── Derived state for empty-state message ─────────────────────────────────
+  const emptyMessage = selectedLocation
+    ? `No parking facilities found within ${searchRadius} km of "${selectedLocation.label}".`
+    : 'No matching facilities found.';
+
   return (
     <div className="map-sidebar">
-      
-      {/* Header title area */}
+
+      {/* Header */}
       <div className="sidebar-header">
         <h2 className="sidebar-title">Nearby Facilities</h2>
         <p className="sidebar-subtitle">AI-assisted smart location router</p>
       </div>
 
-      {/* Real-time search input */}
-      <div className="search-wrapper">
-        <input
-          type="text"
-          className="search-input-field"
-          placeholder="Search facility name..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-        <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-      </div>
+      {/* Location + facility search with autocomplete */}
+      <PlacesSearch
+        value={searchQuery}
+        onChange={onSearchChange}
+        onLocationSelect={onLocationSelect}
+        placeholder="Search location or facility…"
+      />
 
-      {/* Interactive Filters Drawer Box */}
+      {/* Proximity context: shown after a location is selected */}
+      {selectedLocation && (
+        <div className="proximity-context">
+          <span className="proximity-icon">📍</span>
+          <span className="proximity-label" title={selectedLocation.label}>
+            {selectedLocation.label}
+          </span>
+          <span className="proximity-count">
+            {spots.length} {spots.length === 1 ? 'facility' : 'facilities'}
+          </span>
+        </div>
+      )}
+
+      {/* Interactive Filters Drawer */}
       <div className="filters-panel">
-        
+
+        {/* Date & Time Selectors */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label className="filter-header-label">Date</label>
+            <input
+              type="date"
+              className="form-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                padding: '0.35rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.75rem',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label className="filter-header-label">Arrival Time</label>
+            <input
+              type="time"
+              className="form-input"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                padding: '0.35rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.75rem',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Estimated Duration Slider */}
+        <div className="filter-row">
+          <div className="filter-header-label">
+            <span>Duration</span>
+            <span className="filter-value-indicator">{duration} {duration === 1 ? 'hour' : 'hours'}</span>
+          </div>
+          <input
+            type="range"
+            className="filter-slider"
+            min="1"
+            max="12"
+            step="1"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+          />
+        </div>
+
+        {/* Search Radius — only shown when a location is selected */}
+        {selectedLocation && (
+          <div className="filter-row">
+            <div className="filter-header-label">
+              <span>Search Radius</span>
+              <span className="filter-value-indicator">{searchRadius} km</span>
+            </div>
+            <div className="radius-btn-row">
+              {SEARCH_RADII_KM.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`radius-btn${searchRadius === r ? ' active' : ''}`}
+                  onClick={() => onRadiusChange(r)}
+                >
+                  {r} km
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Vehicle Segment Tabs */}
         <div className="filter-row">
           <label className="filter-header-label">Vehicle Compatibility</label>
@@ -78,37 +191,20 @@ export default function ParkingList({
         <div className="filter-row">
           <div className="filter-header-label">
             <span>Max Price</span>
-            <span className="filter-value-indicator">${priceLimit.toFixed(2)}/hr</span>
+            <span className="filter-value-indicator">₹{priceLimit}/hr</span>
           </div>
           <input
             type="range"
             className="filter-slider"
-            min="3.00"
-            max="8.00"
-            step="0.50"
+            min="10"
+            max="200"
+            step="10"
             value={priceLimit}
             onChange={(e) => onPriceChange(Number(e.target.value))}
           />
         </div>
 
-        {/* Max Distance Slider */}
-        <div className="filter-row">
-          <div className="filter-header-label">
-            <span>Max Distance</span>
-            <span className="filter-value-indicator">{distanceLimit.toFixed(1)} mi</span>
-          </div>
-          <input
-            type="range"
-            className="filter-slider"
-            min="0.5"
-            max="2.0"
-            step="0.1"
-            value={distanceLimit}
-            onChange={(e) => onDistanceChange(Number(e.target.value))}
-          />
-        </div>
-
-        {/* Checkbox availability toggles */}
+        {/* Checkbox availability toggle */}
         <label className="filter-toggle-row">
           <span>Available Spaces Only</span>
           <input
@@ -120,7 +216,7 @@ export default function ParkingList({
 
       </div>
 
-      {/* Cards List wrapper */}
+      {/* Cards List */}
       <div className="sidebar-list">
         {spots.length > 0 ? (
           spots.map((spot) => (
@@ -129,18 +225,15 @@ export default function ParkingList({
               spot={spot}
               isSelected={selectedParkingId === spot.id}
               onClick={() => onCardClick(spot.id)}
+              showDistance={Boolean(selectedLocation)}
+              isFavorite={favorites.includes(spot.id)}
+              onToggleFavorite={onToggleFavorite}
             />
           ))
         ) : (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem',
-            color: 'var(--text-muted)',
-            fontSize: '0.9rem',
-            border: '1px dashed rgba(255, 255, 255, 0.05)',
-            borderRadius: '8px'
-          }}>
-            No matching facilities found.
+          <div className="sidebar-empty-state">
+            <span className="sidebar-empty-icon">🅿️</span>
+            <p className="sidebar-empty-msg">{emptyMessage}</p>
           </div>
         )}
       </div>

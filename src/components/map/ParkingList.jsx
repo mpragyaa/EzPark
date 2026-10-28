@@ -35,7 +35,7 @@ export default function ParkingList({
   } = useBooking();
   // ── Derived state for empty-state message ─────────────────────────────────
   const emptyMessage = selectedLocation
-    ? `No parking facilities found within ${searchRadius} km of "${selectedLocation.label}".`
+    ? 'No verified EzPark parking available in this area yet.'
     : 'No matching facilities found.';
 
   return (

@@ -161,6 +161,7 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
     isOpen: facilityIsOpen,
     distanceKm,
     openingHours,
+    isExternal,
   } = facility;
 
   const distanceStr = showDistance ? formatDistance(distanceKm) : null;
@@ -174,6 +175,8 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentTotals, setPaymentTotals] = useState(null);
   const [orderId, setOrderId] = useState(null);
+  const [orderDetails, setOrderDetails] = useState(null);
+  const [bookingId, setBookingId] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
@@ -254,23 +257,44 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
   const handleProceedToPayment = async (totals) => {
     setPaymentTotals(totals);
     try {
-      const order = await paymentService.createOrder(totals.grandTotal);
-      setOrderId(order.id);
+      const order = await paymentService.createOrder(facilityId, duration, totals.couponCode);
+      
+      const newBookingId = await onBookNow?.(facility, {
+        grandTotal: order.amount,
+        discount: totals.discount || 0,
+        couponCode: totals.couponCode || null,
+        status: 'Pending',
+        razorpay_order_id: order.orderId
+      });
+
+      if (!newBookingId) {
+        throw new Error('Failed to create pending booking.');
+      }
+
+      setBookingId(newBookingId);
+      setOrderId(order.orderId);
+      setOrderDetails(order.orderDetails);
       setIsPaymentOpen(true);
     } catch (err) {
       console.error(err);
+      alert('Error initiating checkout: ' + err.message);
     }
   };
 
-  const handlePaymentSuccess = (response) => {
+  const handlePaymentSuccess = async (response) => {
     setIsPaymentOpen(false);
-    // Proceed to final booking creation passing signature and verified total amount
-    onBookNow?.(facility, {
-      grandTotal: paymentTotals?.grandTotal || estimatedPrice,
-      discount: paymentTotals?.discount || 0,
-      couponCode: paymentTotals?.couponCode || null,
-      paymentId: response.razorpay_payment_id
-    });
+    try {
+      const isVerified = await paymentService.verifyPaymentSignature(response, bookingId);
+      if (isVerified) {
+        onClose?.();
+        navigate('/dashboard');
+      } else {
+        alert('Payment verification failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error verifying payment: ' + err.message);
+    }
   };
 
   return (
@@ -279,10 +303,12 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
       <div className="pd-header">
         <div className="pd-header-text">
           <div className="pd-status-row">
-            <span className={`pd-open-badge ${facilityIsOpen ? 'open' : 'closed'}`}>
-              <span className="pd-open-dot" />
-              {facilityIsOpen ? 'Open Now' : 'Closed'}
-            </span>
+            {!isExternal && (
+              <span className={`pd-open-badge ${facilityIsOpen ? 'open' : 'closed'}`}>
+                <span className="pd-open-dot" />
+                {facilityIsOpen ? 'Open Now' : 'Closed'}
+              </span>
+            )}
             {distanceStr && (
               <span className="pd-distance-chip">
                 📍 {distanceStr}
@@ -360,9 +386,15 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                   📷 Visual Concept Representation
                 </span>
-                <span className="badge-status open" style={{ padding: '0.15rem 0.45rem', fontSize: '0.65rem' }}>
-                  Verified Facility
-                </span>
+                {isExternal ? (
+                  <span className="badge-status closed" style={{ padding: '0.15rem 0.45rem', fontSize: '0.65rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                    External Parking
+                  </span>
+                ) : (
+                  <span className="badge-status open" style={{ padding: '0.15rem 0.45rem', fontSize: '0.65rem' }}>
+                    ✓ EzPark Verified
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -391,9 +423,8 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
               type="button"
               className="pd-btn pd-btn--secondary"
               onClick={() => {
-                const dest = `${facility.latitude},${facility.longitude}`;
-                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
-                window.open(googleMapsUrl, '_blank');
+                const navUrl = facility.google_maps_url || `https://www.google.com/maps/dir/?api=1&destination=${facility.latitude},${facility.longitude}`;
+                window.open(navUrl, '_blank');
               }}
               style={{
                 padding: '0.45rem 0.9rem',
@@ -415,77 +446,27 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
           <div className="pd-stats-grid" style={{ marginBottom: '1.25rem' }}>
             <div className="pd-stat-card">
               <span className="pd-stat-label">Rate</span>
-              <span className="pd-stat-value">{formatPrice(pricePerHour)}</span>
+              <span className="pd-stat-value">
+                {isExternal ? 'Pricing unavailable' : pricePerHour != null && !isNaN(pricePerHour) ? formatPrice(pricePerHour) : 'Unavailable'}
+              </span>
             </div>
             <div className="pd-stat-card">
               <span className="pd-stat-label">Rating</span>
-              <span className="pd-stat-value pd-stat-rating">{formatRating(rating)}</span>
+              <span className="pd-stat-value pd-stat-rating">{isExternal ? 'NA' : rating != null ? formatRating(rating) : 'NA'}</span>
             </div>
             <div className="pd-stat-card">
               <span className="pd-stat-label">Opening Hours</span>
-              <span className="pd-stat-value">{val(openingHours || '24/7 Open')}</span>
+              <span className="pd-stat-value">{isExternal ? 'Unavailable' : val(openingHours || '24/7 Open')}</span>
             </div>
             <div className="pd-stat-card">
               <span className="pd-stat-label">Total Slots</span>
-              <span className="pd-stat-value">{val(totalSlots)}</span>
+              <span className="pd-stat-value">{isExternal ? 'Availability unavailable' : totalSlots != null ? val(totalSlots) : 'Unavailable'}</span>
             </div>
           </div>
 
           {/* Dynamic Amenities & Vehicle Compatibility Badges */}
-          <div style={{ marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              padding: '0.2rem 0.55rem',
-              borderRadius: '4px',
-              textTransform: 'uppercase'
-            }}>
-              🚗 Compatible: CAR
-            </span>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              padding: '0.2rem 0.55rem',
-              borderRadius: '4px',
-              textTransform: 'uppercase'
-            }}>
-              🏍️ Compatible: BIKE
-            </span>
-            {facility.hasEVCharging && (
-              <span style={{
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                backgroundColor: 'var(--color-success-glow)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                color: 'var(--color-success)',
-                padding: '0.2rem 0.55rem',
-                borderRadius: '4px',
-                textTransform: 'uppercase'
-              }}>
-                ⚡ Compatible: EV
-              </span>
-            )}
-            {facility.isCovered && (
-              <span style={{
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                color: '#60a5fa',
-                padding: '0.2rem 0.55rem',
-                borderRadius: '4px',
-                textTransform: 'uppercase'
-              }}>
-                ☂️ Covered Parking
-              </span>
-            )}
-            {facility.hasCCTV && (
+          {!isExternal && (
+            <div style={{ marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
               <span style={{
                 fontSize: '0.7rem',
                 fontWeight: 700,
@@ -496,43 +477,110 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
                 borderRadius: '4px',
                 textTransform: 'uppercase'
               }}>
-                📹 CCTV Active
+                🚗 Compatible: CAR
               </span>
-            )}
-          </div>
+              <span style={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)',
+                padding: '0.2rem 0.55rem',
+                borderRadius: '4px',
+                textTransform: 'uppercase'
+              }}>
+                🏍️ Compatible: BIKE
+              </span>
+              {facility.hasEVCharging && (
+                <span style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backgroundColor: 'var(--color-success-glow)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  color: 'var(--color-success)',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}>
+                  ⚡ Compatible: EV
+                </span>
+              )}
+              {facility.isCovered && (
+                <span style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  color: '#60a5fa',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}>
+                  ☂️ Covered Parking
+                </span>
+              )}
+              {facility.hasCCTV && (
+                <span style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}>
+                  📹 CCTV Active
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Available slots count visual indicator */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <ParkingAvailability
-              availableSlots={availableSlots}
-              totalSlots={totalSlots}
-            />
-          </div>
+          {!isExternal && availableSlots != null && totalSlots != null && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <ParkingAvailability
+                availableSlots={availableSlots}
+                totalSlots={totalSlots}
+              />
+            </div>
+          )}
 
           {/* ── Interactive Floor Grid for direct Slot Selection ── */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-            <h3 className="amenities-section-title" style={{ marginBottom: '0.85rem' }}>Select Available Space</h3>
-            
-            {loadingSlots ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '2rem 1rem' }}>
-                <div className="pd-loading-mini-spinner" style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid rgba(255,255,255,0.05)',
-                  borderTopColor: 'var(--color-primary)',
-                  borderRadius: '50%',
-                  animation: 'pd-mini-spin 0.8s linear infinite'
-                }} />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Loading slot map...</span>
-              </div>
-            ) : (
-              <SlotGrid
-                slots={filteredSlots}
-                selectedSlot={selectedSlot}
-                onSlotSelect={setSelectedSlot}
-              />
-            )}
-          </div>
+          {isExternal ? (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem', paddingBottom: '1.25rem' }}>
+              <h3 className="amenities-section-title" style={{ marginBottom: '0.85rem' }}>External Location</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                This is a real parking location discovered via Geoapify Places.
+                <br /><br />
+                Because it is not managed by EzPark, we cannot provide pricing, availability, or booking functionality. You can still use the <strong>Navigate</strong> button above for accurate directions.
+              </p>
+            </div>
+          ) : (
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+              <h3 className="amenities-section-title" style={{ marginBottom: '0.85rem' }}>Select Available Space</h3>
+              
+              {loadingSlots ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', padding: '2rem 1rem' }}>
+                  <div className="pd-loading-mini-spinner" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid rgba(255,255,255,0.05)',
+                    borderTopColor: 'var(--color-primary)',
+                    borderRadius: '50%',
+                    animation: 'pd-mini-spin 0.8s linear infinite'
+                  }} />
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Loading slot map...</span>
+                </div>
+              ) : (
+                <SlotGrid
+                  slots={filteredSlots}
+                  selectedSlot={selectedSlot}
+                  onSlotSelect={setSelectedSlot}
+                />
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="pd-body" style={{ paddingTop: '1.25rem' }}>
@@ -552,7 +600,7 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
       )}
 
       {/* ── Sticky Action Details Footer ── */}
-      {step === 'details' && (
+      {step === 'details' && !isExternal && (
         <div className="pd-footer">
           <button
             className="pd-btn pd-btn--secondary"
@@ -589,9 +637,11 @@ function PanelContent({ facility, onClose, onBookNow, showDistance }) {
         isOpen={isPaymentOpen}
         amount={paymentTotals?.grandTotal || estimatedPrice}
         orderId={orderId}
+        orderDetails={orderDetails}
+        user={user}
         onSuccess={handlePaymentSuccess}
         onCancel={() => setIsPaymentOpen(false)}
-        onFailure={(err) => alert(err.message || 'Payment transaction failed.')}
+        onFailure={(err) => { alert(err.message || 'Payment transaction failed.'); setIsPaymentOpen(false); }}
       />
 
       <style>{`

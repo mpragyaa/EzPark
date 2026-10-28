@@ -16,7 +16,6 @@ import { parkingService } from '../services/parkingService';
 import { realtimeService } from '../services/realtimeService';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../contexts/BookingContext';
-import { mockParkingFacilities } from '../data/mockParkingFacilities';
 import { favoritesService } from '../services/favoritesService';
 import '../styles/dashboard.css';
 
@@ -51,8 +50,7 @@ export default function UserDashboard() {
       try {
         lotsData = await parkingService.fetchLots();
       } catch (lotsErr) {
-        console.warn('[UserDashboard] DB fetchLots failed, using mock data:', lotsErr);
-        lotsData = mockParkingFacilities;
+        console.warn('[UserDashboard] DB fetchLots failed, no internal locations found:', lotsErr);
       }
       
       // Join/map facility details for local storage bookings

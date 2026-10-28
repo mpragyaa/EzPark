@@ -64,7 +64,10 @@ export default function AdminDashboard() {
         isCovered: lot.is_covered,
         openTime: lot.open_time,
         closeTime: lot.close_time,
-        isOpen: lot.is_open
+        isOpen: lot.is_open,
+        isActive: lot.is_active,
+        isVerified: lot.is_verified,
+        googleMapsUrl: lot.google_maps_url
       }));
       setLots(adaptedLots);
 
@@ -142,7 +145,10 @@ export default function AdminDashboard() {
       is_covered: savedLot.isCovered,
       open_time: savedLot.openTime,
       close_time: savedLot.closeTime,
-      is_open: savedLot.isOpen
+      is_open: savedLot.isOpen,
+      is_active: savedLot.isActive,
+      is_verified: savedLot.isVerified,
+      google_maps_url: savedLot.googleMapsUrl
     };
 
     try {

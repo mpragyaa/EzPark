@@ -114,7 +114,7 @@ export const bookingService = {
           entry_time,
           exit_time,
           total_amount,
-          status: 'Confirmed',
+          status: bookingData.status || 'Confirmed',
         }])
         .select()
         .single();
@@ -140,7 +140,8 @@ export const bookingService = {
         .insert([{
           booking_id: booking.id,
           amount: total_amount,
-          status: 'Paid',
+          status: bookingData.status === 'Pending' ? 'Pending' : 'Paid',
+          razorpay_order_id: bookingData.razorpay_order_id || null
         }]);
 
       if (payErr) console.error('Payment sync alert:', payErr);
@@ -161,7 +162,7 @@ export const bookingService = {
       entry_time,
       exit_time,
       total_amount: parseFloat(total_amount),
-      status: 'Confirmed',
+      status: bookingData.status || 'Confirmed',
       created_at: new Date().toISOString(),
     };
 
@@ -262,6 +263,31 @@ export const bookingService = {
   },
 
   /**
+   * Update booking status manually (useful for failure handling).
+   */
+  async updateBookingStatus(bookingId, status) {
+    if (SUPABASE_AVAILABLE && supabase) {
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ status })
+        .eq('id', bookingId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    }
+
+    const bookings = getLocalBookings();
+    const idx = bookings.findIndex((b) => b.id === bookingId);
+    if (idx !== -1) {
+      bookings[idx].status = status;
+      saveLocalBookings(bookings);
+      return bookings[idx];
+    }
+  },
+
+  /**
    * Fetch all bookings for a user.
    *
    * @param {string} [userId='demo-user']
@@ -288,6 +314,22 @@ export const bookingService = {
   // Aliases for compatibility
   async fetchUserBookings(userId) {
     return this.getBookings(userId);
+  },
+
+  // ADMIN: Fetch all bookings across all users
+  async fetchAllBookings() {
+    if (SUPABASE_AVAILABLE && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('*, users(first_name, last_name), parking_facilities(name, address)')
+          .order('created_at', { ascending: false });
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn('[bookingService] fetchAllBookings Supabase unreachable, using local bookings:', err.message);
+      }
+    }
+    return getLocalBookings();
   },
 
   // Retrieve local slot state overrides

@@ -26,7 +26,11 @@ function buildMarkerIcon(spot, isSelected) {
   const { availableSlots } = spot;
 
   let color = '#10b981'; // green
-  if (availableSlots === 0) {
+  if (spot.isExternal) {
+    color = '#64748b'; // slate (neutral for external)
+  } else if (availableSlots == null) {
+    color = '#94a3b8'; // light slate (neutral for unknown internal)
+  } else if (availableSlots === 0) {
     color = '#ef4444'; // red
   } else if (availableSlots <= 5) {
     color = '#f59e0b'; // amber
@@ -246,8 +250,9 @@ export default function LeafletMap({
         {markers.map((spot) => {
           const isSelected = spot.id === selectedId;
           const icon = getCachedMarkerIcon(spot, isSelected);
-          const slotsLabel =
-            spot.availableSlots === 0
+          const slotsLabel = spot.isExternal || spot.availableSlots == null
+              ? 'Availability unavailable'
+              : spot.availableSlots === 0
               ? 'Full'
               : `${spot.availableSlots} / ${spot.totalSlots ?? '?'} slots free`;
 
@@ -272,10 +277,16 @@ export default function LeafletMap({
                 <div className="lmap-popup-card">
                   <div className="lmap-popup-header">
                     <h4 className="lmap-popup-title">{spot.name}</h4>
-                    {spot.isOpen !== undefined && (
-                      <span className={`lmap-popup-badge ${spot.isOpen ? 'open' : 'closed'}`}>
-                        {spot.isOpen ? 'Open' : 'Closed'}
+                    {spot.isExternal ? (
+                      <span className="lmap-popup-badge" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                        External Parking
                       </span>
+                    ) : (
+                      spot.isOpen !== undefined && (
+                        <span className={`lmap-popup-badge ${spot.isOpen ? 'open' : 'closed'}`}>
+                          {spot.isOpen ? 'Open' : 'Closed'}
+                        </span>
+                      )
                     )}
                   </div>
 
@@ -286,7 +297,7 @@ export default function LeafletMap({
                   <div className="lmap-popup-stats">
                     <div className="lmap-popup-stat">
                       <span className="lmap-popup-stat-label">Slots</span>
-                      <span className={`lmap-popup-stat-value ${spot.availableSlots === 0 ? 'lmap-stat-red' : 'lmap-stat-green'}`}>
+                      <span className={`lmap-popup-stat-value ${spot.isExternal || spot.availableSlots == null ? '' : spot.availableSlots === 0 ? 'lmap-stat-red' : 'lmap-stat-green'}`}>
                         {slotsLabel}
                       </span>
                     </div>
@@ -294,11 +305,11 @@ export default function LeafletMap({
                     <div className="lmap-popup-stat">
                       <span className="lmap-popup-stat-label">Price</span>
                       <span className="lmap-popup-stat-value">
-                        ₹{spot.pricePerHour?.toFixed(2)}/hr
+                        {spot.isExternal ? 'Unavailable' : spot.pricePerHour != null && !isNaN(spot.pricePerHour) ? `₹${Number(spot.pricePerHour).toFixed(2)}/hr` : 'Unavailable'}
                       </span>
                     </div>
 
-                    {spot.rating != null && (
+                    {!spot.isExternal && spot.rating != null && (
                       <div className="lmap-popup-stat">
                         <span className="lmap-popup-stat-label">Rating</span>
                         <span className="lmap-popup-stat-value lmap-rating">

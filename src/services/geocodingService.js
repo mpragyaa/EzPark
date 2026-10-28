@@ -32,6 +32,9 @@ const FETCH_OPTS = {
   },
 };
 
+// Cache for Nominatim queries
+const geocodeCache = new Map();
+
 /**
  * Format a Nominatim display_name into a shorter label.
  * e.g. "Connaught Place, New Delhi, Delhi, 110001, India" → "Connaught Place, New Delhi"
@@ -54,8 +57,16 @@ function formatShortName(displayName) {
 export async function searchLocation(query, { limit = 6, countrycodes = '' } = {}) {
   if (!query || query.trim().length < 2) return [];
 
+  const safeQuery = query.trim();
+  console.log(`[Discovery Pipeline] Search input: "${safeQuery}"`);
+
+  if (geocodeCache.has(safeQuery)) {
+    console.log(`[Discovery Pipeline] Returning Nominatim results from cache for "${safeQuery}"`);
+    return geocodeCache.get(safeQuery);
+  }
+
   const params = new URLSearchParams({
-    q: query.trim(),
+    q: safeQuery,
     format: 'json',
     limit: String(limit),
     addressdetails: '1',
@@ -78,7 +89,7 @@ export async function searchLocation(query, { limit = 6, countrycodes = '' } = {
 
   const data = await res.json();
 
-  return data.map((item) => ({
+  const formattedResults = data.map((item) => ({
     placeId: item.place_id,
     displayName: item.display_name,
     shortName: formatShortName(item.display_name),
@@ -86,6 +97,19 @@ export async function searchLocation(query, { limit = 6, countrycodes = '' } = {
     lng: parseFloat(item.lon),
     type: item.type ?? item.class ?? 'place',
   }));
+
+  console.log(`[Discovery Pipeline] Nominatim result count: ${formattedResults.length}`);
+  if (formattedResults.length > 0) {
+    const top = formattedResults[0];
+    console.log(`[Discovery Pipeline] Top Nominatim result:`);
+    console.log(`  - Display Name: ${top.displayName}`);
+    console.log(`  - Lat/Lng: ${top.lat}, ${top.lng}`);
+    console.log(`  - Type: ${top.type}`);
+  }
+
+  geocodeCache.set(safeQuery, formattedResults);
+  
+  return formattedResults;
 }
 
 /**

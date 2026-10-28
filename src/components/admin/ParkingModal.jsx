@@ -13,6 +13,9 @@ export default function ParkingModal({ isOpen, onClose, onSave, lot }) {
   const [isCovered, setIsCovered] = useState(false);
   const [openTime, setOpenTime] = useState('06:00');
   const [closeTime, setCloseTime] = useState('22:00');
+  const [isActive, setIsActive] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
 
   // Load values when editing
   useEffect(() => {
@@ -29,6 +32,9 @@ export default function ParkingModal({ isOpen, onClose, onSave, lot }) {
       setIsCovered(lot.isCovered || false);
       setOpenTime(lot.openTime || '06:00');
       setCloseTime(lot.closeTime || '22:00');
+      setIsActive(lot.isActive !== false); // Default true
+      setIsVerified(lot.isVerified || false);
+      setGoogleMapsUrl(lot.googleMapsUrl || '');
     } else {
       // Reset to defaults
       setName('');
@@ -43,6 +49,9 @@ export default function ParkingModal({ isOpen, onClose, onSave, lot }) {
       setIsCovered(false);
       setOpenTime('06:00');
       setCloseTime('22:00');
+      setIsActive(true);
+      setIsVerified(false);
+      setGoogleMapsUrl('');
     }
   }, [lot, isOpen]);
 
@@ -64,7 +73,10 @@ export default function ParkingModal({ isOpen, onClose, onSave, lot }) {
       isCovered,
       openTime,
       closeTime,
-      isOpen: true
+      isOpen: true,
+      isActive,
+      isVerified,
+      googleMapsUrl
     };
 
     onSave(compiledLotData);
@@ -196,6 +208,38 @@ export default function ParkingModal({ isOpen, onClose, onSave, lot }) {
               />
               <span>Covered Parking</span>
             </label>
+          </div>
+
+          {/* Admin Verification & Status Controls */}
+          <div className="admin-checkbox-row" style={{ marginTop: '0.5rem', marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+            <label className="auth-checkbox-container">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
+              <span>Active (Requires Verification for Public Discovery)</span>
+            </label>
+            <label className="auth-checkbox-container">
+              <input
+                type="checkbox"
+                checked={isVerified}
+                onChange={(e) => setIsVerified(e.target.checked)}
+              />
+              <span style={{ color: 'var(--color-primary)' }}>★ Verified Facility</span>
+            </label>
+          </div>
+          
+          {/* Google Maps URL Optional Override */}
+          <div className="form-group">
+            <label className="auth-input-label">Google Maps URL (Optional)</label>
+            <input
+              type="url"
+              className="auth-input-field"
+              placeholder="e.g. https://goo.gl/maps/..."
+              value={googleMapsUrl}
+              onChange={(e) => setGoogleMapsUrl(e.target.value)}
+            />
           </div>
 
           {/* Operational Hours */}

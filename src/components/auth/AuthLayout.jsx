@@ -4,10 +4,7 @@ import '../../styles/auth.css';
 
 export default function AuthLayout({ children }) {
   return (
-    <main className="auth-page-container">
-      {/* Glowing backdrop layer */}
-      <div className="auth-spotlight" />
-
+    <main className="auth-layout">
       {/* Glassmorphic Animated Login/Signup card wrapper */}
       <motion.div 
         className="auth-card"

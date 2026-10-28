@@ -39,10 +39,6 @@ export default function Navbar() {
     }
   };
 
-  const ctaPath = isAuthenticated
-    ? (user?.role === 'operator' || user?.role === 'admin' ? '/operator' : '/dashboard')
-    : '/login';
-
   return (
     <div className={`navbar-wrapper ${scrolled ? 'scrolled' : ''}`}>
       <motion.nav
@@ -59,30 +55,35 @@ export default function Navbar() {
         {/* Center: Navigation Links */}
         <ul className="navbar-menu">
           <li>
-            <a href="#features" className="navbar-link">
+            <a href="/#features" className="navbar-link">
               Features
             </a>
           </li>
           <li>
-            <a href="#technology" className="navbar-link">
-              Technology
-            </a>
-          </li>
-          <li>
-            <Link to={ctaPath} className="navbar-link">
-              Console
-            </Link>
-          </li>
-          <li>
-            <a href="#contact" className="navbar-link">
+            <a href="/#contact" className="navbar-link">
               Contact
             </a>
+          </li>
+          <li>
+            <Link to="/login" className="navbar-link">
+              Login
+            </Link>
           </li>
         </ul>
 
         {/* Right: Premium CTA Button */}
-        <MotionLink
-          to={ctaPath}
+        <motion.button
+          onClick={(e) => {
+            e.preventDefault();
+            if (window.location.pathname !== '/') {
+              window.location.href = '/';
+            } else {
+              const el = document.querySelector('.map-section-container');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }
+          }}
           className="navbar-cta"
           whileHover={{ 
             scale: 1.04,
@@ -91,8 +92,8 @@ export default function Navbar() {
           }}
           whileTap={{ scale: 0.98 }}
         >
-          Open Console →
-        </MotionLink>
+          Get Started
+        </motion.button>
       </motion.nav>
     </div>
   );

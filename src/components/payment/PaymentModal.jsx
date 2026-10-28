@@ -1,59 +1,91 @@
 /**
  * PaymentModal.jsx
  *
- * Glassmorphic simulated checkout gateway interface.
- * Mimics Razorpay Checkout behaviors, allowing UPI, Card, Net Banking, and Wallet selections.
- * Allows simulating success/failure for testing checkout flows.
+ * Real Razorpay checkout gateway integration.
+ * Loads the Razorpay script and opens the checkout popup when initiated.
  */
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, QrCode, Globe, Wallet, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { paymentService } from '../../services/paymentService';
 
 export default function PaymentModal({
   isOpen,
-  amount, // grand total in INR
+  amount, // Used for display while loading
   orderId,
+  orderDetails, // Needed for real Razorpay
+  user,
   onSuccess,
   onCancel,
   onFailure
 }) {
-  const [activeTab, setActiveTab] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState(null); // 'success' | 'failed' | null
+  const [errorMsg, setErrorMsg] = useState(null);
 
-  // Card fields
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [cardName, setCardName] = useState('');
+  useEffect(() => {
+    let rzp;
 
-  // UPI fields
-  const [upiId, setUpiId] = useState('');
+    const openRazorpay = async () => {
+      setIsProcessing(true);
+      setErrorMsg(null);
+      
+      try {
+        const loaded = await paymentService.loadRazorpay();
+        if (!loaded) {
+          throw new Error('Failed to load Razorpay SDK. Please check your connection.');
+        }
+
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_fallback', // Enter the Key ID generated from the Dashboard
+          amount: orderDetails?.amount || Math.round(amount * 100), 
+          currency: orderDetails?.currency || 'INR',
+          name: 'EZPARK',
+          description: 'Parking Reservation',
+          image: '/vite.svg', // Replace with your logo
+          order_id: orderId,
+          handler: function (response) {
+            // Payment succeeded, pass the response back to parent to verify
+            onSuccess?.(response);
+          },
+          prefill: {
+            name: user?.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}` : 'EZPARK User',
+            email: user?.email || '',
+            contact: user?.user_metadata?.phone_number || ''
+          },
+          theme: {
+            color: '#3b82f6' // Match your primary color
+          },
+          modal: {
+            ondismiss: function() {
+              setIsProcessing(false);
+              onCancel?.();
+            }
+          }
+        };
+
+        rzp = new window.Razorpay(options);
+        
+        rzp.on('payment.failed', function (response) {
+          setIsProcessing(false);
+          onFailure?.(new Error(response.error.description));
+        });
+
+        rzp.open();
+      } catch (err) {
+        setIsProcessing(false);
+        setErrorMsg(err.message);
+      }
+    };
+
+    if (isOpen && orderId && !isProcessing) {
+      openRazorpay();
+    }
+
+    return () => {
+      // Clean up if needed
+    };
+  }, [isOpen, orderId]); // Dependency array specifically looking at isOpen and orderId
 
   if (!isOpen) return null;
-
-  const handlePay = async (simulateSuccess = true) => {
-    setIsProcessing(true);
-    // Simulate payment transaction network latency
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsProcessing(false);
-
-    if (simulateSuccess) {
-      setPaymentStatus('success');
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      onSuccess?.({
-        razorpay_payment_id: `pay_${Math.random().toString(36).substring(2, 12).toUpperCase()}`,
-        razorpay_order_id: orderId,
-        razorpay_signature: `sig_${Math.random().toString(36).substring(2, 22).toUpperCase()}`
-      });
-    } else {
-      setPaymentStatus('failed');
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setPaymentStatus(null); // reset for retry
-      onFailure?.(new Error('Payment failed. Try a different method.'));
-    }
-  };
 
   return (
     <div style={{
@@ -67,334 +99,59 @@ export default function PaymentModal({
       backdropFilter: 'blur(5px)'
     }}>
       <div style={{
-        width: 'min(440px, 94%)',
+        width: 'min(380px, 94%)',
         backgroundColor: 'var(--bg-secondary)',
         border: '1px solid var(--border-color)',
         borderRadius: 'var(--radius-md)',
         boxShadow: 'var(--shadow-xl)',
-        overflow: 'hidden',
-        position: 'relative'
+        padding: '2rem',
+        textAlign: 'center'
       }}>
-        {/* Header */}
-        <div style={{
-          backgroundColor: '#0a0d14',
-          borderBottom: '1px solid var(--border-color)',
-          padding: '1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-primary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              EzPark Merchant Gate
-            </span>
-            <h3 style={{ margin: '0.2rem 0 0 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              Choose Payment Method
-            </h3>
-          </div>
-          <button 
-            type="button" 
-            onClick={onCancel}
-            disabled={isProcessing}
-            style={{ color: 'var(--text-muted)', cursor: isProcessing ? 'not-allowed' : 'pointer' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Amount bar */}
-        <div style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.05)',
-          padding: '0.75rem 1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: '1px solid var(--border-color)'
-        }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Order ID: {orderId?.substring(0, 12)}</span>
-          <strong style={{ fontSize: '1.15rem', color: 'var(--color-success)', fontWeight: 800 }}>
-            ₹{amount?.toFixed(2)}
-          </strong>
-        </div>
-
-        {/* Main Body */}
-        {paymentStatus === null && !isProcessing && (
-          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', minHeight: '260px' }}>
-            {/* Tabs Sidebar */}
-            <div style={{
-              borderRight: '1px solid var(--border-color)',
-              backgroundColor: '#0a0d14',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              {[
-                { id: 'card', icon: CreditCard, label: 'Card' },
-                { id: 'upi', icon: QrCode, label: 'UPI' },
-                { id: 'banking', icon: Globe, label: 'Net' },
-                { id: 'wallets', icon: Wallet, label: 'Wallet' }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      padding: '1rem 0.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      borderBottom: '1px solid var(--border-color)',
-                      backgroundColor: isActive ? 'var(--bg-secondary)' : 'transparent',
-                      color: isActive ? 'var(--color-primary)' : 'var(--text-secondary)',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <Icon size={18} />
-                    <span style={{ fontSize: '0.62rem', fontWeight: 650 }}>{tab.label}</span>
-                  </button>
-                );
-              })}
+        {errorMsg ? (
+          <>
+            <div style={{ color: 'var(--color-error)', marginBottom: '1rem' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ margin: '0 auto' }}>
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
             </div>
-
-            {/* Tab Panels */}
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              {/* Card panel */}
-              {activeTab === 'card' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Card Number</label>
-                    <input
-                      type="text"
-                      placeholder="4111 2222 3333 4444"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      style={{
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '0.8rem',
-                        backgroundColor: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Expiry</label>
-                      <input
-                        type="text"
-                        placeholder="MM / YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        style={{
-                          padding: '0.5rem 0.75rem',
-                          fontSize: '0.8rem',
-                          backgroundColor: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '4px',
-                          color: 'var(--text-primary)',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>CVV</label>
-                      <input
-                        type="password"
-                        placeholder="•••"
-                        maxLength={3}
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value)}
-                        style={{
-                          padding: '0.5rem 0.75rem',
-                          fontSize: '0.8rem',
-                          backgroundColor: 'var(--bg-tertiary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '4px',
-                          color: 'var(--text-primary)',
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* UPI panel */}
-              {activeTab === 'upi' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>UPI ID</label>
-                    <input
-                      type="text"
-                      placeholder="username@okaxis"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      style={{
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '0.8rem',
-                        backgroundColor: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.85rem',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
-                    padding: '0.55rem',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(255,255,255,0.02)'
-                  }}>
-                    <span style={{ fontSize: '1.25rem' }}>🤳</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>
-                      You can also scan the QR on the next screen to verify.
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Net banking / Wallets panels */}
-              {(activeTab === 'banking' || activeTab === 'wallets') && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.55rem', alignContent: 'start' }}>
-                  {['HDFC Bank', 'ICICI Bank', 'SBI Bank', 'Paytm', 'PhonePe', 'Google Pay'].map((bank) => (
-                    <button
-                      key={bank}
-                      type="button"
-                      onClick={() => {}}
-                      style={{
-                        padding: '0.5rem',
-                        fontSize: '0.75rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--bg-tertiary)',
-                        color: 'var(--text-primary)',
-                        textAlign: 'center',
-                        fontWeight: 600
-                      }}
-                    >
-                      {bank}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Action Buttons row */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.25rem' }}>
-                <button
-                  type="button"
-                  onClick={() => handlePay(true)}
-                  style={{
-                    backgroundColor: 'var(--color-success)',
-                    color: '#ffffff',
-                    padding: '0.65rem',
-                    borderRadius: '4px',
-                    fontWeight: 700,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Pay ₹{amount?.toFixed(2)} (Simulate Success)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePay(false)}
-                  style={{
-                    backgroundColor: 'var(--color-error-glow)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    color: 'var(--color-error)',
-                    padding: '0.5rem',
-                    borderRadius: '4px',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Simulate Failure
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Processing Spinner state */}
-        {isProcessing && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '260px',
-            gap: '0.85rem'
-          }}>
+            <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Checkout Error</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>{errorMsg}</p>
+            <button 
+              onClick={onCancel}
+              style={{
+                backgroundColor: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </>
+        ) : (
+          <>
             <div style={{
               width: '40px',
               height: '40px',
               border: '3px solid rgba(59, 130, 246, 0.08)',
               borderTopColor: 'var(--color-primary)',
               borderRadius: '50%',
-              animation: 'pay-modal-spin 0.8s linear infinite'
+              animation: 'pay-modal-spin 0.8s linear infinite',
+              margin: '0 auto 1rem'
             }} />
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 650 }}>
-              Verifying payment coordinates...
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+              Opening Secure Checkout
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Please complete your payment in the Razorpay window. Do not refresh this page.
             </p>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              Do not close window or hit refresh.
-            </span>
-          </div>
-        )}
-
-        {/* Success check validation indicator */}
-        {paymentStatus === 'success' && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '260px',
-            gap: '0.85rem',
-            backgroundColor: 'rgba(16, 185, 129, 0.02)'
-          }}>
-            <CheckCircle size={50} style={{ color: 'var(--color-success)' }} />
-            <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-success)', margin: 0 }}>
-              Payment Verified!
-            </h4>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-              Generating secure parking pass receipt...
-            </p>
-          </div>
-        )}
-
-        {/* Failed notification indicator */}
-        {paymentStatus === 'failed' && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '260px',
-            gap: '0.85rem',
-            backgroundColor: 'rgba(239, 68, 68, 0.02)'
-          }}>
-            <AlertTriangle size={50} style={{ color: 'var(--color-error)' }} />
-            <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-error)', margin: 0 }}>
-              Payment Declined
-            </h4>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, padding: '0 2rem', textAlign: 'center' }}>
-              Your bank or wallet rejected the request. Please choose another method.
-            </p>
-          </div>
+          </>
         )}
       </div>
-
       <style>{`
         @keyframes pay-modal-spin {
           to { transform: rotate(360deg); }

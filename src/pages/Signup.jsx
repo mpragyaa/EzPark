@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/auth/AuthLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import '../styles/auth.css';
 
 export default function Signup() {
   const [firstName, setFirstName] = useState('');
@@ -98,11 +99,11 @@ export default function Signup() {
         
         {/* Double Name grid */}
         <div className="auth-grid-row">
-          <div className="auth-input-group">
-            <label className="auth-input-label">First Name</label>
+          <div className="auth-form-group">
+            <label className="auth-label">First Name</label>
             <input
               type="text"
-              className={`auth-input-field ${errors.firstName ? 'invalid' : ''}`}
+              className={`auth-input ${errors.firstName ? 'invalid' : ''}`}
               placeholder="Alex"
               value={firstName}
               onChange={(e) => {
@@ -112,11 +113,11 @@ export default function Signup() {
             />
             {errors.firstName && <span className="auth-error-msg">{errors.firstName}</span>}
           </div>
-          <div className="auth-input-group">
-            <label className="auth-input-label">Last Name</label>
+          <div className="auth-form-group">
+            <label className="auth-label">Last Name</label>
             <input
               type="text"
-              className={`auth-input-field ${errors.lastName ? 'invalid' : ''}`}
+              className={`auth-input ${errors.lastName ? 'invalid' : ''}`}
               placeholder="Smith"
               value={lastName}
               onChange={(e) => {
@@ -129,11 +130,11 @@ export default function Signup() {
         </div>
 
         {/* Email Field */}
-        <div className="auth-input-group">
-          <label className="auth-input-label">Email Address</label>
+        <div className="auth-form-group">
+          <label className="auth-label">Email Address</label>
           <input
             type="email"
-            className={`auth-input-field ${errors.email ? 'invalid' : ''}`}
+            className={`auth-input ${errors.email ? 'invalid' : ''}`}
             placeholder="name@example.com"
             value={email}
             onChange={(e) => {
@@ -145,11 +146,11 @@ export default function Signup() {
         </div>
 
         {/* Phone Field */}
-        <div className="auth-input-group">
-          <label className="auth-input-label">Phone Number</label>
+        <div className="auth-form-group">
+          <label className="auth-label">Phone Number</label>
           <input
             type="tel"
-            className={`auth-input-field ${errors.phone ? 'invalid' : ''}`}
+            className={`auth-input ${errors.phone ? 'invalid' : ''}`}
             placeholder="+1 (555) 000-0000"
             value={phone}
             onChange={(e) => {
@@ -162,11 +163,11 @@ export default function Signup() {
 
         {/* Password Fields */}
         <div className="auth-grid-row">
-          <div className="auth-input-group">
-            <label className="auth-input-label">Password</label>
+          <div className="auth-form-group">
+            <label className="auth-label">Password</label>
             <input
               type="password"
-              className={`auth-input-field ${errors.password ? 'invalid' : ''}`}
+              className={`auth-input ${errors.password ? 'invalid' : ''}`}
               placeholder="••••••••"
               value={password}
               onChange={(e) => {
@@ -176,11 +177,11 @@ export default function Signup() {
             />
             {errors.password && <span className="auth-error-msg">{errors.password}</span>}
           </div>
-          <div className="auth-input-group">
-            <label className="auth-input-label">Confirm Password</label>
+          <div className="auth-form-group">
+            <label className="auth-label">Confirm Password</label>
             <input
               type="password"
-              className={`auth-input-field ${errors.confirmPassword ? 'invalid' : ''}`}
+              className={`auth-input ${errors.confirmPassword ? 'invalid' : ''}`}
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => {
@@ -193,7 +194,7 @@ export default function Signup() {
         </div>
 
         {/* Agree Terms Checkbox */}
-        <div className="auth-form-row" style={{ justifyContent: 'flex-start' }}>
+        <div className="auth-row-helper" style={{ justifyContent: 'flex-start' }}>
           <label className="auth-checkbox-container">
             <input
               type="checkbox"

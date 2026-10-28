@@ -133,7 +133,7 @@
   flex-direction: column;
   gap: 2rem;
   overflow-y: auto;
-  box-height: calc(100vh - 70px);
+  height: calc(100vh - 70px);
   box-sizing: border-box;
 }
 

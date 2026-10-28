@@ -57,10 +57,19 @@ export function filterByRadius(facilities, originLat, originLng, radiusKm = DEFA
  */
 export function sortFacilities(facilities) {
   return [...facilities].sort((a, b) => {
-    // Primary: closest first
+    // 1. Relevance Score (Internal facilities get max score to prevent hiding)
+    const scoreA = a.isExternal ? (a.relevanceScore || 0) : 999;
+    const scoreB = b.isExternal ? (b.relevanceScore || 0) : 999;
+
+    if (scoreA !== scoreB) {
+      return scoreB - scoreA; // Descending relevance
+    }
+    
+    // 2. Primary: closest first
     if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
-    // Secondary: most available slots first
-    return b.availableSlots - a.availableSlots;
+    
+    // 3. Secondary: most available slots first
+    return (b.availableSlots || 0) - (a.availableSlots || 0);
   });
 }
 

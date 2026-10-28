@@ -5,6 +5,8 @@
  * Integrates dynamic Razorpay checkout script loaders.
  */
 
+import { supabase } from './supabase';
+
 function loadScript(src) {
   return new Promise((resolve) => {
     const script = document.createElement('script');
@@ -26,49 +28,61 @@ export const paymentService = {
   },
 
   /**
-   * Initialize a new checkout order.
-   * In a live app, this requests your backend server to create an order via Razorpay API.
-   * Here we simulate it securely with robust offline fallbacks.
+   * Initialize a new checkout order securely via backend.
    *
-   * @param {number} amount - Amount in INR (Rupees)
-   * @returns {Promise<object>} Order details object
+   * @param {string} facilityId
+   * @param {number} duration
+   * @param {string} couponCode
+   * @returns {Promise<object>} Order details object { orderId, amount, orderDetails }
    */
-  async createOrder(amount) {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  async createOrder(facilityId, duration, couponCode = null) {
+    if (!supabase) throw new Error('Supabase is not configured.');
+    
+    const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
+      body: { facilityId, duration, couponCode }
+    });
 
-    const mockOrderId = `order_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-    return {
-      id: mockOrderId,
-      amount: Math.round(amount * 100), // in paise
-      currency: 'INR',
-      receipt: `rec_${Math.random().toString(36).substring(2, 10).toUpperCase()}`
-    };
+    if (error) {
+      throw new Error(`Failed to create order: ${error.message}`);
+    }
+    
+    if (data.error) {
+       throw new Error(`Backend error: ${data.error}`);
+    }
+
+    return data;
   },
 
   /**
-   * Verify signature of completed payment.
-   * In a live app, this runs cryptographic verification on your backend server.
+   * Verify signature of completed payment via backend.
    *
    * @param {object} paymentResponse - Response object from Razorpay checkout
+   * @param {string} bookingId - The ID of the pending booking
    * @returns {Promise<boolean>} Verification outcome
    */
-  async verifyPaymentSignature(paymentResponse) {
-    // Simulate server verification round-trip delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+  async verifyPaymentSignature(paymentResponse, bookingId) {
+    if (!supabase) throw new Error('Supabase is not configured.');
 
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = paymentResponse;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = paymentResponse;
 
-    // Check if parameters exist
-    if (!razorpay_payment_id || !razorpay_order_id) {
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !bookingId) {
       throw new Error('Payment verification parameters missing.');
     }
 
-    // In simulated environments, any transaction ending in FAILED is rejected
-    if (razorpay_payment_id.includes('FAILED')) {
+    const { data, error } = await supabase.functions.invoke('verify-razorpay-payment', {
+      body: { 
+        razorpay_order_id, 
+        razorpay_payment_id, 
+        razorpay_signature, 
+        booking_id 
+      }
+    });
+
+    if (error || (data && data.error)) {
+      console.error('Verification failed:', error?.message || data?.error);
       return false;
     }
 
-    return true;
+    return data?.success || false;
   }
 };

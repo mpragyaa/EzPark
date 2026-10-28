@@ -86,6 +86,12 @@
   gap: 0.5rem;
 }
 
+.auth-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
 .auth-label {
   font-size: 0.75rem;
   font-weight: 650;
@@ -137,6 +143,41 @@
 
 .auth-forgot-link:hover {
   color: var(--color-accent);
+}
+
+/* Checkbox */
+.auth-checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.auth-checkbox-container input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-tertiary);
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-checkbox-container input[type="checkbox"]:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.auth-checkbox-container input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
 }
 
 /* Submit Button */
@@ -191,6 +232,33 @@
   background-color: var(--border-color);
 }
 
+/* OAuth Button */
+.btn-oauth {
+  width: 100%;
+  background-color: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-oauth:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--text-muted);
+}
+
+.btn-oauth svg {
+  color: var(--text-secondary);
+}
+
 /* Switch between sign in / sign up */
 .auth-switch {
   text-align: center;
@@ -219,4 +287,26 @@
   border-radius: var(--radius-sm);
   text-align: center;
   font-weight: 600;
+}
+
+/* Auth Footer */
+.auth-footer {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.auth-footer-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.auth-footer-link:hover {
+  color: var(--color-accent);
 }

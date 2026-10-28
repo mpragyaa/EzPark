@@ -56,11 +56,11 @@ export default function ForgotPassword() {
           <form className="auth-form" onSubmit={handleResetPasswordSubmit}>
             
             {/* Email Field */}
-            <div className="auth-input-group">
-              <label className="auth-input-label">Email Address</label>
+            <div className="auth-form-group">
+              <label className="auth-label">Email Address</label>
               <input
                 type="email"
-                className={`auth-input-field ${errors.email ? 'invalid' : ''}`}
+                className={`auth-input ${errors.email ? 'invalid' : ''}`}
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => {

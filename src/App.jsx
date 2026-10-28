@@ -11,12 +11,12 @@ const UserDashboard = lazy(() => import('./pages/UserDashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 // Premium Loading Spinner overlay panel for route suspense fallbacks
 const LoadingScreen = () => (
-  <main className="auth-page-container">
-    <div className="auth-spotlight" />
+  <main className="auth-layout">
     <div className="auth-card" style={{ textAlign: 'center', padding: '3rem 2rem' }}>
       <svg className="animate-spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="3" style={{ animation: 'spin 1.2s linear infinite', margin: '0 auto 1rem auto' }}>
         <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.05)" />
@@ -45,6 +45,7 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/admin/login" element={<AdminLogin />} />
 
                   {/* Secure Customer Portal */}
                   <Route element={<ProtectedRoute />}>

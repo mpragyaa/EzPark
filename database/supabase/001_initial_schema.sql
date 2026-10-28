@@ -39,6 +39,9 @@ create table public.parking_facilities (
   open_time time default '00:00',
   close_time time default '23:59',
   is_open boolean default true,
+  is_active boolean default true,
+  is_verified boolean default false,
+  google_maps_url text,
   created_at timestamp with time zone default now()
 );
 

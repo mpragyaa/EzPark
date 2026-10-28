@@ -17,7 +17,8 @@ export default function ParkingCard({
     totalSlots,
     rating,
     hasEVCharging,
-    isOpen
+    isOpen,
+    isExternal
   } = spot;
 
   const cardRef = useRef(null);
@@ -77,19 +78,34 @@ export default function ParkingCard({
       {/* Title & Rating */}
       <div className="card-header-row" style={{ paddingRight: '2rem' }}>
         <h3 className="card-title">{name}</h3>
+        {isExternal ? (
+          <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border-color)', alignSelf: 'flex-start' }}>
+            External Parking
+          </span>
+        ) : (
+          <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--color-primary-glow)', color: 'var(--color-primary)', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--color-primary)', alignSelf: 'flex-start' }}>
+            ✓ EzPark Verified
+          </span>
+        )}
+      </div>
+
+      <div className="card-header-row" style={{ marginTop: '0.2rem' }}>
         {rating != null && (
           <span className="badge-status open" style={{
             backgroundColor: 'rgba(255, 184, 0, 0.08)',
             border: '1px solid rgba(255, 184, 0, 0.2)',
-            color: '#ffb800',
+            color: '#f59e0b',
             padding: '0.2rem 0.5rem',
             borderRadius: '4px',
-            fontSize: '0.75rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.2'
+            gap: '0.25rem',
+            fontSize: '0.65rem'
           }}>
-            ★ {Number(rating).toFixed(1)}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            {Number(rating).toFixed(1)}
           </span>
         )}
       </div>
@@ -132,38 +148,50 @@ export default function ParkingCard({
       </div>
 
       {/* Live Occupancy Progress Bar */}
-      <div className="card-occupancy-progress" style={{ marginTop: '0.65rem', marginBottom: '0.2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', fontWeight: 500 }}>
-          <span>Occupancy</span>
-          <span>{Math.round((1 - occupancyRatio) * 100)}%</span>
+      {(availableSlots != null && totalSlots != null) && (
+        <div className="card-occupancy-progress" style={{ marginTop: '0.65rem', marginBottom: '0.2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', fontWeight: 500 }}>
+            <span>Occupancy</span>
+            <span>{Math.round((1 - occupancyRatio) * 100)}%</span>
+          </div>
+          <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${Math.max(0, Math.min(100, (1 - occupancyRatio) * 100))}%`,
+              height: '100%',
+              backgroundColor: availableSlots === 0 ? 'var(--color-error)' : occupancyRatio <= 0.15 ? 'var(--color-warning, #f59e0b)' : 'var(--color-success)',
+              borderRadius: '2px',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
         </div>
-        <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-          <div style={{
-            width: `${Math.max(0, Math.min(100, (1 - occupancyRatio) * 100))}%`,
-            height: '100%',
-            backgroundColor: availableSlots === 0 ? 'var(--color-error)' : occupancyRatio <= 0.15 ? 'var(--color-warning, #f59e0b)' : 'var(--color-success)',
-            borderRadius: '2px',
-            transition: 'width 0.4s ease'
-          }} />
-        </div>
-      </div>
+      )}
 
       {/* Footer statistics (price & slots) */}
       <div className="card-footer-row" style={{ marginTop: '0.4rem' }}>
         <div className="card-price-value">
-          ₹{pricePerHour.toFixed(2)}<span>/hr</span>
+          {pricePerHour != null && !isNaN(pricePerHour) ? (
+            <>₹{Number(pricePerHour).toFixed(2)}<span>/hr</span></>
+          ) : (
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Pricing unavailable</span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {/* Slots Available indicator */}
-          <span className={`card-slots-count ${availableSlots === 0 ? 'limited' : availableSlots <= 5 ? 'limited' : ''}`} style={{ fontSize: '0.75rem' }}>
-            {availableSlots === 0 ? 'Full' : `${availableSlots}/${totalSlots ?? '?'} free`}
-          </span>
+          {availableSlots != null ? (
+            <span className={`card-slots-count ${availableSlots === 0 ? 'limited' : availableSlots <= 5 ? 'limited' : ''}`} style={{ fontSize: '0.75rem' }}>
+              {availableSlots === 0 ? 'Full' : `${availableSlots}/${totalSlots ?? '?'} free`}
+            </span>
+          ) : (
+            <span className="card-slots-count" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Availability unavailable</span>
+          )}
 
           {/* Open/Closed Badge */}
-          <span className={`badge-status ${isOpen ? 'open' : 'closed'}`}>
-            {isOpen ? 'Open' : 'Closed'}
-          </span>
+          {!isExternal && (
+            <span className={`badge-status ${isOpen ? 'open' : 'closed'}`}>
+              {isOpen ? 'Open' : 'Closed'}
+            </span>
+          )}
         </div>
       </div>
     </motion.div>

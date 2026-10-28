@@ -1,9 +1,10 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export default function ProtectedRoute({ adminOnly = false }) {
   const { isAuthenticated, isAdmin, loading } = useAuth();
+  const location = useLocation();
 
   // Premium loading state during authentication lookup
   if (loading) {
@@ -25,6 +26,9 @@ export default function ProtectedRoute({ adminOnly = false }) {
 
   // Redirect to sign in if unauthenticated
   if (!isAuthenticated) {
+    if (adminOnly || location.pathname.startsWith('/operator')) {
+      return <Navigate to="/admin/login" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 

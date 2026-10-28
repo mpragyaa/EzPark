@@ -26,7 +26,7 @@ export function BookingProvider({ children }) {
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   // Search parameters
-  const [searchRadius, setSearchRadius] = useState(10);
+  const [searchRadius, setSearchRadius] = useState(5);
   const [priceLimit, setPriceLimit] = useState(200);
 
   // Clear slot selection if facility changes
